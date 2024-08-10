@@ -1,6 +1,6 @@
 use crate::app::server::interface::InterfaceSettings;
 use crate::app::server::registry::RegistrySettings;
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, net::SocketAddrV4, sync::Mutex};
 
 pub struct Configuration {
     settings: Mutex<Settings>,
@@ -13,7 +13,7 @@ impl Configuration {
         applications.insert(
             "helloworld".to_owned(),
             Application {
-                name: String::from("HelloWorldApp"),
+                address: SocketAddrV4::new("127.0.0.1".parse().unwrap(), 4201),
             },
         );
 
@@ -47,8 +47,8 @@ pub struct Settings {
 }
 
 #[derive(Clone, Debug)]
-struct Application {
-    pub name: String,
+pub struct Application {
+    pub address: SocketAddrV4,
 }
 
 #[derive(Debug)]

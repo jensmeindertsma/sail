@@ -100,7 +100,7 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
     }
 }
 
-struct ServerHandlerFuture {
+pub struct ServerHandlerFuture {
     response_future: Pin<
         Box<dyn Future<Output = Result<HyperResponse<HandlerBody>, Infallible>> + Send + 'static>,
     >,
@@ -114,10 +114,9 @@ impl Future for ServerHandlerFuture {
     }
 }
 
-enum HandlerBody {
+pub enum HandlerBody {
     Axum(AxumBody),
     Error(Full<Bytes>),
-    Hyper(Incoming),
     Proxy(Full<Bytes>),
 }
 
@@ -134,9 +133,6 @@ impl HyperBody for HandlerBody {
             HandlerBody::Error(body) => Pin::new(body)
                 .poll_frame(context)
                 .map_err(|_| BodyError::Infallible),
-            HandlerBody::Hyper(body) => {
-                Pin::new(body).poll_frame(context).map_err(BodyError::Hyper)
-            }
             HandlerBody::Proxy(body) => Pin::new(body)
                 .poll_frame(context)
                 .map_err(|_| BodyError::Infallible),
@@ -148,7 +144,6 @@ impl HyperBody for HandlerBody {
 pub enum BodyError {
     Axum(axum::Error),
     Infallible,
-    Hyper(hyper::Error),
 }
 
 impl Display for BodyError {
@@ -158,8 +153,7 @@ impl Display for BodyError {
             "{}",
             match self {
                 BodyError::Axum(e) => format!("axum body error: {e:?}"),
-                BodyError::Infallible => format!("infallible error:?"),
-                BodyError::Hyper(e) => format!("hyper body error: {e:?}"),
+                BodyError::Infallible => "infallible error:?".to_string(),
             }
         )
     }

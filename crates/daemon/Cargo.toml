@@ -13,6 +13,7 @@ http-body-util.workspace = true
 hyper.workspace = true
 hyper-util = { workspace = true, features = [
     "http1",
+    "http2",
     "server-auto",
     "server-graceful",
     "service",
