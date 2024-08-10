@@ -8,10 +8,12 @@ name = "saild"
 path = "src/main.rs"
 
 [dependencies]
+axum.workspace = true
 http-body-util.workspace = true
-hyper = { workspace = true }
+hyper.workspace = true
 hyper-util = { workspace = true, features = [
     "http1",
+    "server-auto",
     "server-graceful",
     "service",
     "tokio",

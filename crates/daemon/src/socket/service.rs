@@ -1,7 +1,6 @@
 use super::SocketConnection;
 use sail_core::socket::{SocketReply, SocketRequest, SocketResponse};
 use std::{convert::Infallible, future::Future};
-use tower::Service;
 use tracing::{error, info};
 
 pub async fn serve_connection<S, F>(
@@ -9,7 +8,7 @@ pub async fn serve_connection<S, F>(
     mut service: S,
 ) -> Result<(), Infallible>
 where
-    S: Service<SocketRequest, Response = SocketResponse, Error = Infallible, Future = F>,
+    S: tower::Service<SocketRequest, Response = SocketResponse, Error = Infallible, Future = F>,
     F: Future<Output = Result<SocketResponse, Infallible>>,
 {
     info!("handling connection from address {:?}", connection.address);

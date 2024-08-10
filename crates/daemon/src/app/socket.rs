@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tower::Service;
 
 #[derive(Clone)]
 pub struct SocketHandler {
@@ -20,7 +19,7 @@ impl SocketHandler {
     }
 }
 
-impl Service<SocketRequest> for SocketHandler {
+impl tower::Service<SocketRequest> for SocketHandler {
     type Response = SocketResponse;
     type Error = Infallible;
     type Future = SocketHandlerFuture;
@@ -43,7 +42,7 @@ impl Service<SocketRequest> for SocketHandler {
     }
 }
 
-struct SocketHandlerFuture {
+pub struct SocketHandlerFuture {
     response_future:
         Pin<Box<dyn Future<Output = Result<SocketResponse, Infallible>> + Send + 'static>>,
 }

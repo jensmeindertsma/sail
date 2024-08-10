@@ -1,9 +1,18 @@
+pub mod interface;
+pub mod proxy;
+pub mod registry;
+
 use crate::configuration::Configuration;
+use axum::body::Body as AxumBody;
 use core::fmt::{self, Display};
+use http_body_util::Full;
 use hyper::{
-    body::{Body, Bytes, Frame, Incoming},
-    Request as HyperRequest, Response as HyperResponse,
+    body::{Body as HyperBody, Bytes, Frame, Incoming},
+    Request as HyperRequest, Response as HyperResponse, StatusCode,
 };
+use interface::InterfaceHandler;
+use proxy::ProxyHandler;
+use registry::RegistryHandler;
 use std::{
     convert::Infallible,
     error::Error,
@@ -13,59 +22,132 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tower::Service;
 
 #[derive(Clone)]
 pub struct ServerHandler {
+    interface_handler: InterfaceHandler,
+    proxy_handler: ProxyHandler,
+    registry_handler: RegistryHandler,
     configuration: Arc<Configuration>,
 }
 
 impl ServerHandler {
     pub fn new(configuration: Arc<Configuration>) -> Self {
-        Self { configuration }
+        Self {
+            interface_handler: InterfaceHandler::new(configuration.clone()),
+            proxy_handler: ProxyHandler::new(configuration.clone()),
+            registry_handler: RegistryHandler::new(configuration.clone()),
+            configuration,
+        }
     }
 }
 
-impl Service<HyperRequest<Incoming>> for ServerHandler {
+impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
     type Response = HyperResponse<HandlerBody>;
     type Error = Infallible;
     type Future = ServerHandlerFuture;
 
-    fn poll_ready(&mut self, context: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {}
+    fn poll_ready(&mut self, context: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut polled = Vec::new();
 
-    fn call(&mut self, request: HyperRequest<Incoming>) -> Self::Future {}
+        polled.push(self.interface_handler.poll_ready(context));
+        polled.push(self.proxy_handler.poll_ready(context));
+        polled.push(self.registry_handler.poll_ready(context));
+
+        if polled.iter().all(|p| p.is_ready()) {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn call(&mut self, request: HyperRequest<Incoming>) -> Self::Future {
+        let settings = self.configuration.get();
+        let mut interface_handler = self.interface_handler.clone();
+        let mut registry_handler = self.registry_handler.clone();
+        let mut proxy_handler = self.proxy_handler.clone();
+        Self::Future {
+            response_future: Box::pin(async move {
+                let response = match request.headers().get("Host") {
+                    None => make_error_response("missing Host header").map(HandlerBody::Error),
+                    Some(host) => {
+                        let host = match host.to_str() {
+                            Ok(str) => str,
+                            Err(_error) => {
+                                return Ok(make_error_response("invalid host header")
+                                    .map(HandlerBody::Error))
+                            }
+                        };
+
+                        if host == settings.interface.hostname {
+                            interface_handler
+                                .call(request)
+                                .await?
+                                .map(HandlerBody::Axum)
+                        } else if host == settings.registry.hostname {
+                            registry_handler.call(request).await?.map(HandlerBody::Axum)
+                        } else if settings.applications.contains_key(host) {
+                            proxy_handler.call(request).await?.map(HandlerBody::Proxy)
+                        } else {
+                            make_error_response("unknown host").map(HandlerBody::Error)
+                        }
+                    }
+                };
+
+                Ok(response)
+            }),
+        }
+    }
 }
 
-struct ServerHandlerFuture {}
+struct ServerHandlerFuture {
+    response_future: Pin<
+        Box<dyn Future<Output = Result<HyperResponse<HandlerBody>, Infallible>> + Send + 'static>,
+    >,
+}
 
 impl Future for ServerHandlerFuture {
     type Output = Result<HyperResponse<HandlerBody>, Infallible>;
 
-    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {}
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        self.response_future.as_mut().poll(context)
+    }
 }
 
 enum HandlerBody {
+    Axum(AxumBody),
+    Error(Full<Bytes>),
     Hyper(Incoming),
+    Proxy(Full<Bytes>),
 }
 
-impl Body for HandlerBody {
+impl HyperBody for HandlerBody {
     type Data = Bytes;
     type Error = BodyError;
 
     fn poll_frame(
         self: Pin<&mut Self>,
         context: &mut Context<'_>,
-    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+    ) -> Poll<Option<Result<Frame<Self::Data>, BodyError>>> {
         match self.get_mut() {
-            HandlerBody::Hyper(incoming) => Pin::new(incoming)
+            HandlerBody::Axum(body) => Pin::new(body).poll_frame(context).map_err(BodyError::Axum),
+            HandlerBody::Error(body) => Pin::new(body)
                 .poll_frame(context)
-                .map(|o| o.map(|r| r.map_err(BodyError::Hyper))),
+                .map_err(|_| BodyError::Infallible),
+            HandlerBody::Hyper(body) => {
+                Pin::new(body).poll_frame(context).map_err(BodyError::Hyper)
+            }
+            HandlerBody::Proxy(body) => Pin::new(body)
+                .poll_frame(context)
+                .map_err(|_| BodyError::Infallible),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum BodyError {
+    Axum(axum::Error),
+    Infallible,
     Hyper(hyper::Error),
 }
 
@@ -75,6 +157,8 @@ impl Display for BodyError {
             f,
             "{}",
             match self {
+                BodyError::Axum(e) => format!("axum body error: {e:?}"),
+                BodyError::Infallible => format!("infallible error:?"),
                 BodyError::Hyper(e) => format!("hyper body error: {e:?}"),
             }
         )
@@ -83,46 +167,12 @@ impl Display for BodyError {
 
 impl Error for BodyError {}
 
-/*
-Ok(match request.headers().get("Host") {
-            None => HyperResponse::builder()
-                .header("Content-Type", "text/html")
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from(format!(
-                    "<h1>No Host header!</h1>\n"
-                ))))
-                .unwrap(),
-            Some(host) => match host.to_str().unwrap() {
-                "registry.jensmeindertsma.com" => HyperResponse::builder()
-                    .header("Content-Type", "text/html")
-                    .status(StatusCode::OK)
-                    .body(Full::new(Bytes::from(format!(
-                        "<h1>Registry {}</h1>\n",
-                        request.uri()
-                    ))))
-                    .unwrap(),
-                host => {
-                    if let Some(application) = self.configuration.get().applications.get(host) {
-                        HyperResponse::builder()
-                            .header("Content-Type", "text/html")
-                            .status(StatusCode::OK)
-                            .body(Full::new(Bytes::from(format!(
-                                "<h1>Application {} {}</h1>\n",
-                                application.name,
-                                request.uri()
-                            ))))
-                            .unwrap()
-                    } else {
-                        HyperResponse::builder()
-                            .header("Content-Type", "text/html")
-                            .status(StatusCode::BAD_REQUEST)
-                            .body(Full::new(Bytes::from(format!(
-                                "<h1>Unknown host {}!</h1>\n",
-                                host
-                            ))))
-                            .unwrap()
-                    }
-                }
-            },
-        })
-*/
+fn make_error_response(message: &str) -> hyper::Response<Full<Bytes>> {
+    HyperResponse::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header("Content-Type", "text/html")
+        .body(Full::new(Bytes::from(format!(
+            "<h1>Bad request!</h1><p>{message}</p>\n"
+        ))))
+        .unwrap()
+}

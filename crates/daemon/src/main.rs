@@ -5,8 +5,12 @@ mod socket;
 
 use app::{ServerHandler, SocketHandler};
 use configuration::Configuration;
-use hyper::server::conn::http1;
-use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown, service::TowerToHyperService};
+use hyper::service::service_fn;
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::{conn::auto::Builder as ConnectionBuilder, graceful::GracefulShutdown},
+    service::TowerToHyperService,
+};
 use server::Server;
 use socket::Socket;
 use std::{process::ExitCode, sync::Arc, time::Duration};
@@ -145,7 +149,7 @@ async fn main() -> ExitCode {
         }
     };
 
-    let http_stack = http1::Builder::new();
+    let http_stack = ConnectionBuilder::new(TokioExecutor::new()).http1().;
     let shutdown_helper = GracefulShutdown::new();
 
     let span = span!(Level::INFO, "server").entered();
@@ -175,8 +179,10 @@ async fn main() -> ExitCode {
                 // These three lines wrap the connection stream in a future-driven
                 // data structure that handles the whole HTTP1.1 protocol, as well
                 // as registering the connection for graceful shutdown.
-                let io = TokioIo::new(connection.stream);
-                let connection = http_stack.serve_connection(io, TowerToHyperService::new(handler));
+
+
+                // TODO: figure out how to support WebSockets.
+                let connection = http_stack.serve_connection(TokioIo::new(connection.stream), service_fn(hello));
                 let future = shutdown_helper.watch(connection);
 
                 // Each future is then moved into its own task, allowing the accept
@@ -186,8 +192,8 @@ async fn main() -> ExitCode {
                 tokio::spawn(async move {
                     if let Err(error) = future.await {
                         error!("failed to serve http connection: {error:?}")
-                    }.instrument(span!(Level::INFO, "handler"))
-                })
+                    }
+                }.instrument(span!(Level::INFO, "handler")))
             }
         };
     }
@@ -216,4 +222,12 @@ async fn main() -> ExitCode {
     span.exit();
 
     ExitCode::SUCCESS
+}
+
+async fn hello(
+    _: hyper::Request<hyper::body::Incoming>,
+) -> Result<hyper::Response<http_body_util::Full<hyper::body::Bytes>>, std::convert::Infallible> {
+    Ok(hyper::Response::new(http_body_util::Full::new(
+        hyper::body::Bytes::from("Hello, World!"),
+    )))
 }

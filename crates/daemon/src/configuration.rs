@@ -1,3 +1,5 @@
+use crate::app::server::interface::InterfaceSettings;
+use crate::app::server::registry::RegistrySettings;
 use std::{collections::HashMap, sync::Mutex};
 
 pub struct Configuration {
@@ -16,7 +18,15 @@ impl Configuration {
         );
 
         Ok(Self {
-            settings: Mutex::new(Settings { applications }),
+            settings: Mutex::new(Settings {
+                applications,
+                interface: InterfaceSettings {
+                    hostname: "sail.jensmeindertsma.com".to_owned(),
+                },
+                registry: RegistrySettings {
+                    hostname: "registry.jensmeindertsma.com".to_owned(),
+                },
+            }),
         })
     }
 
@@ -32,6 +42,8 @@ impl Configuration {
 #[derive(Clone, Debug)]
 pub struct Settings {
     pub applications: HashMap<String, Application>,
+    pub interface: InterfaceSettings,
+    pub registry: RegistrySettings,
 }
 
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-mod server;
+pub mod server;
 mod socket;
 
 pub use server::ServerHandler;
