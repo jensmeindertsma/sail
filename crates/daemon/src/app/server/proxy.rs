@@ -1,16 +1,18 @@
 use crate::configuration::Configuration;
 use http_body_util::Full;
 use hyper::{
-    body::{Bytes, Incoming},
-    Response, StatusCode,
+    body::{Body as HyperBody, Bytes, Frame, Incoming},
+    Request, Response,
 };
+use hyper_util::rt::TokioIo;
 use std::{
-    convert::Infallible,
     future::Future,
+    net::SocketAddrV4,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
+use tokio::net::TcpStream;
 
 #[derive(Clone)]
 pub struct ProxyHandler {
@@ -23,14 +25,9 @@ impl ProxyHandler {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ProxySettings {
-    pub hostname: String,
-}
-
 impl tower::Service<hyper::Request<Incoming>> for ProxyHandler {
-    type Response = hyper::Response<Full<Bytes>>;
-    type Error = Infallible;
+    type Response = hyper::Response<Incoming>;
+    type Error = ProxyError;
     type Future =
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
@@ -39,20 +36,77 @@ impl tower::Service<hyper::Request<Incoming>> for ProxyHandler {
     }
 
     fn call(&mut self, request: hyper::Request<Incoming>) -> Self::Future {
-        Box::pin(async move {
-            Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "text/html")
-                .body(Full::new(Bytes::from(format!(
-                    "<h1>Proxy {} {}</h1>",
-                    request
-                        .headers()
-                        .get("Host")
-                        .map(|v| v.to_str().unwrap_or("<invalid host>"))
-                        .unwrap_or("<no host>"),
-                    request.uri()
-                ))))
-                .unwrap())
-        })
+        let host = request
+            .headers()
+            .get("Host")
+            .map(|h| h.to_str().unwrap())
+            .unwrap();
+
+        let address = self
+            .configuration
+            .get()
+            .applications
+            .get(host)
+            .unwrap()
+            .address;
+
+        Box::pin(async move { fetch(address, request).await })
+    }
+}
+
+pub async fn fetch(
+    address: SocketAddrV4,
+    request: Request<Incoming>,
+) -> Result<Response<Incoming>, ProxyError> {
+    let stream = TcpStream::connect(address)
+        .await
+        .map_err(|_e| ProxyError::Connection)?;
+
+    let io = TokioIo::new(stream);
+
+    let (mut sender, connection) = hyper::client::conn::http1::handshake(io)
+        .await
+        .map_err(|_e| ProxyError::Handshake)?;
+
+    // Spawn a task to poll the connection, driving the HTTP state
+    let driver = tokio::spawn(connection);
+
+    let response = sender
+        .send_request(request)
+        .await
+        .map_err(|_e| ProxyError::Send)?;
+
+    if let Err(_e) = driver.await.unwrap() {
+        return Err(ProxyError::Completion);
+    };
+
+    Ok(response)
+}
+
+#[derive(Debug)]
+pub enum ProxyError {
+    Connection,
+    Completion,
+    Handshake,
+    Send,
+}
+
+pub enum ProxyBody {
+    Error(Full<Bytes>),
+    Incoming(Incoming),
+}
+
+impl HyperBody for ProxyBody {
+    type Data = Bytes;
+    type Error = ();
+
+    fn poll_frame(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, ()>>> {
+        match self.get_mut() {
+            ProxyBody::Error(body) => Pin::new(body).poll_frame(context).map_err(|_| ()),
+            ProxyBody::Incoming(body) => Pin::new(body).poll_frame(context).map_err(|_| ()),
+        }
     }
 }

@@ -76,7 +76,6 @@ async fn main() -> ExitCode {
     });
 
     let mut stop_rx_socket = stop_rx.clone();
-    let configuration_socket = configuration.clone();
     // We place the socket handling logic into a separate
     // tokio task, so it can process requests without blocking the server.
     let socket_task_handle = tokio::spawn(
@@ -111,7 +110,7 @@ async fn main() -> ExitCode {
                             }
                         };
 
-                        let service = SocketHandler::new(configuration_socket.clone());
+                        let service = SocketHandler::new();
                         let future = socket::serve_connection(connection, service);
 
                         // Already established connections are spawned into their
@@ -140,7 +139,7 @@ async fn main() -> ExitCode {
         .instrument(span!(Level::INFO, "socket")),
     );
 
-    let server = match Server::new(configuration.clone()).await {
+    let server = match Server::new().await {
         Ok(server) => server,
         Err(error) => {
             error!("failed to set up server: {error:?}");
@@ -172,6 +171,8 @@ async fn main() -> ExitCode {
                         continue
                     }
                 };
+
+                info!("accepted new connection from {}", connection.address);
 
                 let handler = ServerHandler::new(configuration.clone());
 

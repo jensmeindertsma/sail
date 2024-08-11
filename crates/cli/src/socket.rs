@@ -46,20 +46,20 @@ impl Socket {
 
 #[derive(Debug)]
 pub enum SocketError {
-    Io(io::Error),
+    Io,
     NoReply,
-    Serialization(serde_json::Error),
+    Serialization,
     ReplyMismatch,
 }
 
 impl From<io::Error> for SocketError {
-    fn from(value: io::Error) -> Self {
-        Self::Io(value)
+    fn from(_value: io::Error) -> Self {
+        Self::Io
     }
 }
 
 impl From<serde_json::Error> for SocketError {
-    fn from(value: serde_json::Error) -> Self {
-        Self::Serialization(value)
+    fn from(_value: serde_json::Error) -> Self {
+        Self::Serialization
     }
 }

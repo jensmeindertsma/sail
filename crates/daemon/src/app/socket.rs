@@ -1,21 +1,17 @@
-use crate::configuration::Configuration;
 use sail_core::socket::{SocketRequest, SocketResponse};
 use std::{
     convert::Infallible,
     future::Future,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
 #[derive(Clone)]
-pub struct SocketHandler {
-    configuration: Arc<Configuration>,
-}
+pub struct SocketHandler;
 
 impl SocketHandler {
-    pub fn new(configuration: Arc<Configuration>) -> Self {
-        Self { configuration }
+    pub fn new() -> Self {
+        Self
     }
 }
 

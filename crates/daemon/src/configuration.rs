@@ -34,9 +34,9 @@ impl Configuration {
         self.settings.lock().unwrap().clone()
     }
 
-    pub fn set(&self, new_settings: Settings) {
-        *self.settings.lock().unwrap() = new_settings;
-    }
+    // pub fn set(&self, new_settings: Settings) {
+    //     *self.settings.lock().unwrap() = new_settings;
+    // }
 }
 
 #[derive(Clone, Debug)]

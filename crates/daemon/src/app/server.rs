@@ -11,7 +11,7 @@ use hyper::{
     Request as HyperRequest, Response as HyperResponse, StatusCode,
 };
 use interface::InterfaceHandler;
-use proxy::ProxyHandler;
+use proxy::{ProxyBody, ProxyHandler};
 use registry::RegistryHandler;
 use std::{
     convert::Infallible,
@@ -34,9 +34,9 @@ pub struct ServerHandler {
 impl ServerHandler {
     pub fn new(configuration: Arc<Configuration>) -> Self {
         Self {
-            interface_handler: InterfaceHandler::new(configuration.clone()),
+            interface_handler: InterfaceHandler::new(),
             proxy_handler: ProxyHandler::new(configuration.clone()),
-            registry_handler: RegistryHandler::new(configuration.clone()),
+            registry_handler: RegistryHandler::new(),
             configuration,
         }
     }
@@ -50,9 +50,26 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
     fn poll_ready(&mut self, context: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let mut polled = Vec::new();
 
-        polled.push(self.interface_handler.poll_ready(context));
-        polled.push(self.proxy_handler.poll_ready(context));
-        polled.push(self.registry_handler.poll_ready(context));
+        enum PollError {
+            Infallible,
+            ProxyError,
+        }
+
+        polled.push(
+            self.interface_handler
+                .poll_ready(context)
+                .map_err(|_| PollError::Infallible),
+        );
+        polled.push(
+            self.proxy_handler
+                .poll_ready(context)
+                .map_err(|_| PollError::ProxyError),
+        );
+        polled.push(
+            self.registry_handler
+                .poll_ready(context)
+                .map_err(|_| PollError::Infallible),
+        );
 
         if polled.iter().all(|p| p.is_ready()) {
             Poll::Ready(Ok(()))
@@ -69,12 +86,13 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
         Self::Future {
             response_future: Box::pin(async move {
                 let response = match request.headers().get("Host") {
-                    None => make_error_response("missing Host header").map(HandlerBody::Error),
+                    None => make_error_response("missing Host header".to_owned())
+                        .map(HandlerBody::Error),
                     Some(host) => {
                         let host = match host.to_str() {
                             Ok(str) => str,
                             Err(_error) => {
-                                return Ok(make_error_response("invalid host header")
+                                return Ok(make_error_response("invalid host header".to_owned())
                                     .map(HandlerBody::Error))
                             }
                         };
@@ -87,9 +105,18 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
                         } else if host == settings.registry.hostname {
                             registry_handler.call(request).await?.map(HandlerBody::Axum)
                         } else if settings.applications.contains_key(host) {
-                            proxy_handler.call(request).await?.map(HandlerBody::Proxy)
+                            let result = match proxy_handler.call(request).await {
+                                Ok(response) => response.map(ProxyBody::Incoming),
+                                Err(error) => {
+                                    make_error_response(format!("proxy failed! {:?}", error))
+                                        .map(ProxyBody::Error)
+                                }
+                            };
+
+                            result.map(HandlerBody::Proxy)
                         } else {
-                            make_error_response("unknown host").map(HandlerBody::Error)
+                            make_error_response(format!("unknown host!! `{host}`"))
+                                .map(HandlerBody::Error)
                         }
                     }
                 };
@@ -117,7 +144,7 @@ impl Future for ServerHandlerFuture {
 pub enum HandlerBody {
     Axum(AxumBody),
     Error(Full<Bytes>),
-    Proxy(Full<Bytes>),
+    Proxy(ProxyBody),
 }
 
 impl HyperBody for HandlerBody {
@@ -161,7 +188,7 @@ impl Display for BodyError {
 
 impl Error for BodyError {}
 
-fn make_error_response(message: &str) -> hyper::Response<Full<Bytes>> {
+fn make_error_response(message: String) -> hyper::Response<Full<Bytes>> {
     HyperResponse::builder()
         .status(StatusCode::BAD_REQUEST)
         .header("Content-Type", "text/html")

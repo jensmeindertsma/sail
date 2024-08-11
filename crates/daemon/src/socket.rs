@@ -20,12 +20,12 @@ impl Socket {
     pub fn attach() -> Result<Self, SocketError> {
         use std::os::unix::net::UnixListener as StdUnixListener;
 
-        let fd = env::var("LISTEN_FDS").map_err(SocketError::InvalidVariable)?;
+        let fd = env::var("LISTEN_FDS").map_err(|_e| SocketError::InvalidVariable)?;
 
         let fd: i32 = fd.parse().map_err(|_| VarError::NotUnicode(fd.into()))?;
 
         if fd != 1 {
-            return Err(SocketError::UnexpectedFileDescriptor(fd));
+            return Err(SocketError::UnexpectedFileDescriptor);
         }
 
         // SAFETY: this file descriptor comes from systemd
@@ -52,19 +52,19 @@ impl Socket {
 
 #[derive(Debug)]
 pub enum SocketError {
-    Io(io::Error),
-    UnexpectedFileDescriptor(i32),
-    InvalidVariable(VarError),
+    Io,
+    UnexpectedFileDescriptor,
+    InvalidVariable,
 }
 
 impl From<io::Error> for SocketError {
-    fn from(value: io::Error) -> Self {
-        Self::Io(value)
+    fn from(_value: io::Error) -> Self {
+        Self::Io
     }
 }
 
 impl From<VarError> for SocketError {
-    fn from(value: VarError) -> Self {
-        Self::InvalidVariable(value)
+    fn from(_value: VarError) -> Self {
+        Self::InvalidVariable
     }
 }

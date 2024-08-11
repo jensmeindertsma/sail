@@ -1,4 +1,3 @@
-use crate::configuration::Configuration;
 use axum::{
     extract::Request as AxumRequest, response::Response as AxumResponse,
     routing::future::RouteFuture, Router as AxumRouter,
@@ -6,21 +5,18 @@ use axum::{
 use hyper::body::Incoming;
 use std::{
     convert::Infallible,
-    sync::Arc,
     task::{Context, Poll},
 };
 
 #[derive(Clone)]
 pub struct RegistryHandler {
     router: AxumRouter<()>,
-    configuration: Arc<Configuration>,
 }
 
 impl RegistryHandler {
-    pub fn new(configuration: Arc<Configuration>) -> Self {
+    pub fn new() -> Self {
         Self {
             router: AxumRouter::new(),
-            configuration,
         }
     }
 }

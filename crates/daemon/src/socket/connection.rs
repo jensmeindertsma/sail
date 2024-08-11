@@ -1,6 +1,6 @@
 use sail_core::socket::{SocketMessage, SocketReply};
 use tokio::{
-    io::{self, AsyncWriteExt, BufReader, Lines},
+    io::{AsyncWriteExt, BufReader, Lines},
     net::unix::{OwnedReadHalf, OwnedWriteHalf, SocketAddr},
 };
 
@@ -29,12 +29,12 @@ impl SocketConnection {
             .reader
             .next_line()
             .await
-            .map_err(ConnectionError::Read)?;
+            .map_err(|_e| ConnectionError::Read)?;
 
         Ok(match maybe_line {
             Some(line) => Some(
                 serde_json::from_str::<SocketMessage>(&line)
-                    .map_err(ConnectionError::Deserialization)?,
+                    .map_err(|_e| ConnectionError::Deserialization)?,
             ),
             None => None,
         })
@@ -45,12 +45,12 @@ impl SocketConnection {
             .write_all(
                 format!(
                     "{}\n",
-                    serde_json::to_string(&reply).map_err(ConnectionError::Serialization)?
+                    serde_json::to_string(&reply).map_err(|_e| ConnectionError::Serialization)?
                 )
                 .as_bytes(),
             )
             .await
-            .map_err(ConnectionError::Write)?;
+            .map_err(|_e| ConnectionError::Write)?;
 
         Ok(())
     }
@@ -58,8 +58,8 @@ impl SocketConnection {
 
 #[derive(Debug)]
 pub enum ConnectionError {
-    Deserialization(serde_json::Error),
-    Read(io::Error),
-    Serialization(serde_json::Error),
-    Write(io::Error),
+    Deserialization,
+    Read,
+    Serialization,
+    Write,
 }
