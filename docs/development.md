@@ -30,6 +30,7 @@ Follow these steps to set up your development environment inside a Ubuntu VM. We
    ```
    ```
    sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+   sudo usermod -aG docker {USERNAME}
    ```
 
 3. Install Nix:
