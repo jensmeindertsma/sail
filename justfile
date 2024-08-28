@@ -1,6 +1,9 @@
 help:
     just --list
 
+logs: 
+    journalctl -f --output cat -f sail
+
 build:
     cargo build
 

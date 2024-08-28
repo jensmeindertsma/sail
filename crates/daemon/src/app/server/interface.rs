@@ -2,7 +2,7 @@ use axum::{
     extract::Request as AxumRequest, response::Response as AxumResponse,
     routing::future::RouteFuture, Router as AxumRouter,
 };
-use hyper::body::Incoming;
+use hyper::{body::Incoming, StatusCode, Uri};
 use std::{
     convert::Infallible,
     task::{Context, Poll},
@@ -16,9 +16,16 @@ pub struct InterfaceHandler {
 impl InterfaceHandler {
     pub fn new() -> Self {
         Self {
-            router: AxumRouter::new(),
+            router: AxumRouter::new().fallback(fallback),
         }
     }
+}
+
+async fn fallback(uri: Uri) -> (StatusCode, String) {
+    (
+        StatusCode::NOT_FOUND,
+        format!("INTERFACE No route for {uri}"),
+    )
 }
 
 #[derive(Clone, Debug)]
