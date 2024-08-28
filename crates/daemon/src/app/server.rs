@@ -22,6 +22,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct ServerHandler {
@@ -85,29 +86,50 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
         let mut proxy_handler = self.proxy_handler.clone();
         Self::Future {
             response_future: Box::pin(async move {
+                info!(
+                    "handling request to {} with host {}",
+                    request.uri(),
+                    request
+                        .headers()
+                        .get("Host")
+                        .map(|h| h.to_str().unwrap().to_owned())
+                        .unwrap_or(String::from("<none>"))
+                );
+
                 let response = match request.headers().get("Host") {
-                    None => make_error_response("missing Host header".to_owned())
-                        .map(HandlerBody::Error),
+                    None => {
+                        error!("request has no `Host` header");
+                        make_error_response("missing Host header".to_owned())
+                            .map(HandlerBody::Error)
+                    }
                     Some(host) => {
                         let host = match host.to_str() {
                             Ok(str) => str,
                             Err(_error) => {
-                                return Ok(make_error_response("invalid host header".to_owned())
-                                    .map(HandlerBody::Error))
+                                return {
+                                    error!("request has invalid `Host` header");
+                                    Ok(make_error_response("invalid host header".to_owned())
+                                        .map(HandlerBody::Error))
+                                }
                             }
                         };
 
                         if host == settings.interface.hostname {
+                            info!("forwarding request to interface");
                             interface_handler
                                 .call(request)
                                 .await?
                                 .map(HandlerBody::Axum)
                         } else if host == settings.registry.hostname {
+                            info!("forwarding request to registry");
+
                             registry_handler.call(request).await?.map(HandlerBody::Axum)
                         } else if settings.applications.contains_key(host) {
+                            info!("forwarding request to proxy");
                             let result = match proxy_handler.call(request).await {
                                 Ok(response) => response.map(ProxyBody::Incoming),
                                 Err(error) => {
+                                    error!("proxy failed to handle request: {error:?}");
                                     make_error_response(format!("proxy failed! {:?}", error))
                                         .map(ProxyBody::Error)
                                 }
@@ -115,11 +137,14 @@ impl tower::Service<HyperRequest<Incoming>> for ServerHandler {
 
                             result.map(HandlerBody::Proxy)
                         } else {
+                            error!("request has unknown `Host` header `{host}`");
                             make_error_response(format!("unknown host!! `{host}`"))
                                 .map(HandlerBody::Error)
                         }
                     }
                 };
+
+                info!("responding with {}", response.status());
 
                 Ok(response)
             }),

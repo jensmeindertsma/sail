@@ -69,10 +69,6 @@ async fn main() -> ExitCode {
 
     let configuration = Arc::new(match Configuration::from_filesystem() {
         Ok(configuration) => configuration,
-        Err(error) => {
-            error!("Failed to get configuration from filesystem: {error:?}");
-            return ExitCode::FAILURE;
-        }
     });
 
     let mut stop_rx_socket = stop_rx.clone();
@@ -125,11 +121,7 @@ async fn main() -> ExitCode {
                         // future since it is probably not too difficult to implement this manually.
                         // We'd need some kind of way to reply to all open messages with a
                         // `SocketResponse::Shutdown`.
-                        tokio::spawn(async move {
-                            if let Err(error) = future.await {
-                                error!("failed to serve socket connection: {error:?}")
-                            }.instrument(span!(Level::INFO, "handler"))
-                        });
+                        tokio::spawn(future.instrument(span!(Level::INFO, "handler")));
                     }
                 }
             }
