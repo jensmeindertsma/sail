@@ -1,6 +1,9 @@
 help:
     just --list
 
+logs: 
+    journalctl -f --output cat -f sail
+
 build:
     cargo build
 
@@ -11,7 +14,6 @@ install: build
     #!/usr/bin/env bash
     echo "Installing Sail"
     sudo groupadd sail 2>/dev/null
-    sudo usermod -aG sail $USER
     sudo systemctl stop sail.socket
     sudo systemctl stop sail.service
     sudo cp /home/jens/dev/sail/target/debug/sail /usr/local/bin/sail
