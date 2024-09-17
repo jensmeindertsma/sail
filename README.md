@@ -2,15 +2,19 @@
 
 Application deployment that is easy, reliable and self-owned.
 
-## TODO
+## Overview
 
-- [ ] proxying logic
-- [ ] persistent configuration,
-- [ ] Implement upload endpoint for Docker images
-  - Allow secret key creation during app creation that can be rotated with the CLI. This secret must be provided when uploading an app as a security/protection feature.
-- [ ] Set up Docker image for `rooster`
-- [ ] Set up CI for `rooster` that uploads to the endpoint
-- [ ] Implement Docker container restarting when new images are uploaded
-- [ ] Implement SQLite database volume attachment and providing database url
-- [ ] implement database backup on deploy
-- [ ] Implement more CLI commands that give an overview of current status
+- Config at /etc/sail/config.toml
+- App config at /etc/sail/apps/foo.toml
+- SQLite at /var?????
+- Socket listener
+- HTTP listener is of second importance, just make it respond with hello world to all
+- Want less code inside select macro, functions better for rust-analyzer
+
+- INSTALL SCRIPT, and self update ability!!
+- sail update should load new binaries from github, replace them, then restart service.
+-
+
+- install script should fetch sail binary from github,
+
+then run sail update
