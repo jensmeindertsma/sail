@@ -17,3 +17,5 @@ upgrade:
     sudo cp /home/jens/dev/sail/target/debug/saild /usr/local/bin/saild
     just start
 
+build-release:
+    cargo build --release
