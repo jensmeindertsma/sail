@@ -8,7 +8,7 @@ use sail_core::{
 };
 use socket::Socket;
 use std::{process::ExitCode, sync::Arc};
-use tracing::{error, info, info_span, Level};
+use tracing::{error, info, info_span, Instrument, Level};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -31,58 +31,69 @@ async fn main() -> ExitCode {
         }
     };
 
-    let span = info_span!("socket").entered();
+    let span = info_span!("socket");
+    let guard = span.enter();
     while let Some(mut connection) = socket.accept().await {
         let configuration = configuration.clone();
-        tokio::spawn(async move {
-            // Wait for incoming messages over the connection, then handle their request,
-            // and reply with an appropriate response.
-            while let Some(message) = connection.next_message().await {
-                info!(
-                    "received message #{} with request {:?}",
-                    message.id, message.request
-                );
+        tokio::spawn(
+            async move {
+                // Wait for incoming messages over the connection, then handle their request,
+                // and reply with an appropriate response.
+                while let Some(message) = connection.next_message().await {
+                    info!(
+                        "received message #{} with request {:?}",
+                        message.id, message.request
+                    );
 
-                let response = match message.request {
-                    SocketRequest::ListApplications => SocketResponse::Success(
-                        SuccessResponse::ListApplications(configuration.get().applications),
-                    ),
+                    let response = match message.request {
+                        SocketRequest::ListApplications => SocketResponse::Success(
+                            SuccessResponse::ListApplications(configuration.get().applications),
+                        ),
 
-                    SocketRequest::CreateApplication {
-                        name,
-                        hostname,
-                        address,
-                    } => {
-                        let mut settings = configuration.get();
+                        SocketRequest::CreateApplication {
+                            name,
+                            hostname,
+                            address,
+                        } => {
+                            let mut settings = configuration.get();
 
-                        if settings.applications.iter().any(|app| app.name == name) {
-                            SocketResponse::Failure(FailureReason::NameInUse)
-                        } else {
-                            settings.applications.push(Application {
-                                name: name.clone(),
-                                hostname,
-                                address,
-                            });
+                            if settings.applications.iter().any(|app| app.name == name) {
+                                SocketResponse::Failure(FailureReason::NameInUse)
+                            } else {
+                                settings.applications.push(Application {
+                                    name: name.clone(),
+                                    hostname,
+                                    address,
+                                });
 
-                            configuration.set(settings);
+                                configuration.set(settings);
 
-                            SocketResponse::Success(SuccessResponse::CreatedApplication { name })
+                                SocketResponse::Success(SuccessResponse::CreatedApplication {
+                                    name,
+                                })
+                            }
                         }
-                    }
 
-                    _ => SocketResponse::Failure(FailureReason::Todo),
-                };
+                        _ => SocketResponse::Failure(FailureReason::Todo),
+                    };
 
-                connection
-                    .reply(SocketReply {
-                        regarding: message.id,
-                        response,
-                    })
-                    .await
+                    info!(
+                        "replying to message #{} with response {:?}",
+                        message.id, response
+                    );
+
+                    connection
+                        .reply(SocketReply {
+                            regarding: message.id,
+                            response,
+                        })
+                        .await
+                }
             }
-        });
+            .instrument(span.clone()),
+        );
     }
-    span.exit();
+    drop(guard);
 
     ExitCode::SUCCESS
 }
