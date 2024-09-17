@@ -10,13 +10,6 @@ jobs:
       - name: Install `just` command runner
         uses: extractions/setup-just@v2
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          # Do not install the `rust-src` component that is defined in the
-          # rust-toolchain.toml file, as it is needed only by rust-analyzer.
-          components:
-
       - name: Compile project
         run: just build-release
 
