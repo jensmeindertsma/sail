@@ -1,7 +1,7 @@
 name: ci
 on: push
 jobs:
-  upgrade:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
