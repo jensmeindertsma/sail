@@ -12,7 +12,7 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub fn connect(socket_path: impl AsRef<Path>) -> Result<Self, SocketError> {
+    pub fn connect(socket_path: impl AsRef<Path>) -> Result<Self, SocketConnectError> {
         let stream = UnixStream::connect(socket_path)?;
 
         Ok(Self {
@@ -31,10 +31,24 @@ impl Socket {
         self.next_id += 1;
 
         self.writer
-            .write_all(format!("{}\n", serde_json::to_string(&message)?).as_bytes())?;
+            .write_all(
+                format!(
+                    "{}\n",
+                    serde_json::to_string(&message)
+                        .map_err(|e| SocketError::FailedSerialization(e))?
+                )
+                .as_bytes(),
+            )
+            .map_err(|e| SocketError::WriteFailure(e))?;
 
-        let reply: SocketReply =
-            serde_json::from_str(&self.reader.next().ok_or(SocketError::NoReply)??)?;
+        let reply: SocketReply = serde_json::from_str(
+            &self
+                .reader
+                .next()
+                .ok_or(SocketError::NoReply)?
+                .map_err(|e| SocketError::ReadFailure(e))?,
+        )
+        .map_err(|e| SocketError::FailedDeserialization(e))?;
 
         if reply.regarding != message.id {
             return Err(SocketError::ReplyMismatch);
@@ -44,22 +58,20 @@ impl Socket {
     }
 }
 
+pub struct SocketConnectError(pub io::Error);
+
+impl From<io::Error> for SocketConnectError {
+    fn from(value: io::Error) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug)]
 pub enum SocketError {
-    Io,
+    FailedDeserialization(serde_json::Error),
+    FailedSerialization(serde_json::Error),
     NoReply,
-    Serialization,
+    ReadFailure(io::Error),
     ReplyMismatch,
-}
-
-impl From<io::Error> for SocketError {
-    fn from(_value: io::Error) -> Self {
-        Self::Io
-    }
-}
-
-impl From<serde_json::Error> for SocketError {
-    fn from(_value: serde_json::Error) -> Self {
-        Self::Serialization
-    }
+    WriteFailure(io::Error),
 }
