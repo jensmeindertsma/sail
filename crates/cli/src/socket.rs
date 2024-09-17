@@ -1,3 +1,4 @@
+use core::fmt::{self, Formatter};
 use sail_core::socket::{SocketMessage, SocketReply, SocketRequest, SocketResponse};
 use std::{
     io::{self, BufRead, BufReader, Lines, Write},
@@ -12,11 +13,11 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub fn connect(socket_path: impl AsRef<Path>) -> Result<Self, SocketConnectError> {
-        let stream = UnixStream::connect(socket_path)?;
+    pub fn connect(socket_path: impl AsRef<Path>) -> Result<Self, ()> {
+        let stream = UnixStream::connect(socket_path).map_err(|_| ())?;
 
         Ok(Self {
-            reader: BufReader::new(stream.try_clone()?).lines(),
+            reader: BufReader::new(stream.try_clone().map_err(|_| ())?).lines(),
             writer: stream,
             next_id: 1,
         })
@@ -58,14 +59,6 @@ impl Socket {
     }
 }
 
-pub struct SocketConnectError(pub io::Error);
-
-impl From<io::Error> for SocketConnectError {
-    fn from(value: io::Error) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Debug)]
 pub enum SocketError {
     FailedDeserialization(serde_json::Error),
@@ -74,4 +67,25 @@ pub enum SocketError {
     ReadFailure(io::Error),
     ReplyMismatch,
     WriteFailure(io::Error),
+}
+
+impl fmt::Display for SocketError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FailedDeserialization(error) => {
+                write!(f, "failed to deserialize reply: {error:?}")
+            }
+            Self::FailedSerialization(error) => {
+                write!(f, "failed to serialize request: {error:?}")
+            }
+            Self::NoReply => write!(f, "received no reply from daemon"),
+            Self::ReadFailure(io_error) => {
+                write!(f, "failed to read from the socket: {io_error:?}")
+            }
+            Self::ReplyMismatch => write!(f, "incoming reply has ID mismatch"),
+            Self::WriteFailure(io_error) => {
+                write!(f, "failed to write to the socket: {io_error:?}")
+            }
+        }
+    }
 }

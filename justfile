@@ -2,29 +2,18 @@ help:
     just --list
 
 logs: 
-    journalctl -f --output cat -f sail
+    journalctl --follow --output cat --unit sail
 
-build:
+stop:
+    sudo systemctl stop sail 2>/dev/null
+
+start:
+    sudo systemctl start sail    
+
+upgrade:
     cargo build
-
-build-release:
-    cargo build --release
-
-install: build
-    #!/usr/bin/env bash
-    echo "Installing Sail"
-    sudo groupadd sail 2>/dev/null
-    sudo systemctl stop sail.socket
-    sudo systemctl stop sail.service
+    just stop
     sudo cp /home/jens/dev/sail/target/debug/sail /usr/local/bin/sail
     sudo cp /home/jens/dev/sail/target/debug/saild /usr/local/bin/saild
-    sudo cp /home/jens/dev/sail/install/systemd.service /usr/lib/systemd/system/sail.service
-    sudo cp /home/jens/dev/sail/install/systemd.socket /usr/lib/systemd/system/sail.socket
-    sudo systemctl daemon-reload
-    sudo systemctl reset-failed
-    
-    sudo systemctl enable --now sail
-
-status type:
-    sudo systemctl status sail.{{type}}
+    just start
 

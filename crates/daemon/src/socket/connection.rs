@@ -1,65 +1,58 @@
 use sail_core::socket::{SocketMessage, SocketReply};
 use tokio::{
-    io::{AsyncWriteExt, BufReader, Lines},
-    net::unix::{OwnedReadHalf, OwnedWriteHalf, SocketAddr},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
+    net::{
+        unix::{OwnedReadHalf, OwnedWriteHalf},
+        UnixStream,
+    },
 };
+use tracing::error;
 
-#[derive(Debug)]
 pub struct SocketConnection {
     reader: Lines<BufReader<OwnedReadHalf>>,
     writer: OwnedWriteHalf,
-    pub address: SocketAddr,
 }
 
 impl SocketConnection {
-    pub fn new(
-        reader: Lines<BufReader<OwnedReadHalf>>,
-        writer: OwnedWriteHalf,
-        address: SocketAddr,
-    ) -> Self {
+    pub fn new(stream: UnixStream) -> Self {
+        let (reader, writer) = stream.into_split();
         Self {
-            reader,
+            reader: BufReader::new(reader).lines(),
             writer,
-            address,
         }
     }
 
-    pub async fn accept(&mut self) -> Result<Option<SocketMessage>, ConnectionError> {
-        let maybe_line = self
-            .reader
-            .next_line()
-            .await
-            .map_err(|_e| ConnectionError::Read)?;
-
-        Ok(match maybe_line {
-            Some(line) => Some(
-                serde_json::from_str::<SocketMessage>(&line)
-                    .map_err(|_e| ConnectionError::Deserialization)?,
-            ),
-            None => None,
-        })
+    pub async fn next_message(&mut self) -> Option<SocketMessage> {
+        match self.reader.next_line().await {
+            Ok(maybe_line) => match serde_json::from_str(&maybe_line?) {
+                Ok(message) => message,
+                Err(error) => {
+                    error!("failed to deserialize incoming message: {error:?}");
+                    return None;
+                }
+            },
+            Err(error) => {
+                error!("failed to read from the socket: {error:?}");
+                return None;
+            }
+        }
     }
 
-    pub async fn reply(&mut self, reply: SocketReply) -> Result<(), ConnectionError> {
-        self.writer
-            .write_all(
-                format!(
-                    "{}\n",
-                    serde_json::to_string(&reply).map_err(|_e| ConnectionError::Serialization)?
-                )
-                .as_bytes(),
-            )
+    pub async fn reply(&mut self, reply: SocketReply) {
+        let serialized_reply = match serde_json::to_string(&reply) {
+            Ok(string) => string,
+            Err(error) => {
+                error!("failed to serialize outgoing reply: {error:?}");
+                return;
+            }
+        };
+
+        if let Err(error) = self
+            .writer
+            .write_all(format!("{serialized_reply}\n").as_bytes())
             .await
-            .map_err(|_e| ConnectionError::Write)?;
-
-        Ok(())
+        {
+            error!("failed to write to the socket: {error:?}");
+        };
     }
-}
-
-#[derive(Debug)]
-pub enum ConnectionError {
-    Deserialization,
-    Read,
-    Serialization,
-    Write,
 }

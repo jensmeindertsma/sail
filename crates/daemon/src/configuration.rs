@@ -1,55 +1,29 @@
-use crate::app::server::interface::InterfaceSettings;
-use crate::app::server::registry::RegistrySettings;
-use std::{collections::HashMap, net::SocketAddrV4, sync::Mutex};
+use sail_core::configuration::Application;
+use std::sync::Mutex;
 
 pub struct Configuration {
     settings: Mutex<Settings>,
 }
 
 impl Configuration {
-    pub fn from_filesystem() -> Result<Self, ConfigurationError> {
-        let mut applications = HashMap::new();
-
-        applications.insert(
-            "helloworld".to_owned(),
-            Application {
-                address: SocketAddrV4::new("127.0.0.1".parse().unwrap(), 4201),
-            },
-        );
-
-        Ok(Self {
+    pub fn load() -> Self {
+        Self {
             settings: Mutex::new(Settings {
-                applications,
-                interface: InterfaceSettings {
-                    hostname: "sail.jensmeindertsma.com".to_owned(),
-                },
-                registry: RegistrySettings {
-                    hostname: "registry.jensmeindertsma.com".to_owned(),
-                },
+                applications: Vec::new(),
             }),
-        })
+        }
     }
 
     pub fn get(&self) -> Settings {
         self.settings.lock().unwrap().clone()
     }
 
-    // pub fn set(&self, new_settings: Settings) {
-    //     *self.settings.lock().unwrap() = new_settings;
-    // }
+    pub fn set(&self, new_settings: Settings) {
+        *self.settings.lock().unwrap() = new_settings;
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Settings {
-    pub applications: HashMap<String, Application>,
-    pub interface: InterfaceSettings,
-    pub registry: RegistrySettings,
+    pub applications: Vec<Application>,
 }
-
-#[derive(Clone, Debug)]
-pub struct Application {
-    pub address: SocketAddrV4,
-}
-
-#[derive(Debug)]
-pub enum ConfigurationError {}

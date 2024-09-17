@@ -1,58 +1,77 @@
+mod command;
 mod socket;
 
-use std::{
-    env,
-    process::{ExitCode, Termination},
-};
-
+use command::Command;
 use owo_colors::OwoColorize;
-use sail_core::socket::SocketRequest;
-use socket::{Socket, SocketConnectError, SocketError};
+use sail_core::socket::{SocketRequest, SocketResponse, SuccessResponse};
+use socket::Socket;
+use std::{env, process::ExitCode};
 
 const SOCKET_PATH: &str = "/run/sail.socket";
 
-fn main() -> impl Termination {
-    let arguments: Vec<String> = env::args().skip(1).collect();
-
-    println!("Arguments: {arguments:?}");
-
-    let mut socket = match Socket::connect(SOCKET_PATH) {
-        Ok(s) => s,
-        Err(SocketConnectError(error)) => {
-            print_error(&format!("failed to connect to socket: {error:?}"), None);
-            return ExitCode::FAILURE;
-        }
-    };
-
-    println!("Sending greeting ...");
-
-    let response = match socket.send_request(SocketRequest::Greeting) {
-        Ok(r) => r,
-        Err(socket_error) => {
+fn main() -> ExitCode {
+    let command = match Command::try_from_arguments(env::args().skip(1)) {
+        Ok(command) => command,
+        Err(error) => {
             print_error(
-                "failed to send request",
-                Some(&match socket_error {
-                    SocketError::FailedDeserialization(de_error) => {
-                        format!("failed to deserialize reply: {de_error:?}")
-                    }
-                    SocketError::FailedSerialization(se_error) => {
-                        format!("failed to serialize request: {se_error:?}")
-                    }
-                    SocketError::NoReply => "received no reply from daemon".to_owned(),
-                    SocketError::ReadFailure(io_error) => {
-                        format!("failed to read from the socket: {io_error:?}")
-                    }
-                    SocketError::ReplyMismatch => "incoming reply has ID mismatch".to_owned(),
-                    SocketError::WriteFailure(io_error) => {
-                        format!("failed to write to the socket: {io_error:?}")
-                    }
-                }),
+                &error.to_string(),
+                Some("run `sail help to view a list of available commands`"),
             );
             return ExitCode::FAILURE;
         }
     };
 
-    println!("Response to greeting = {response:?}");
+    match command {
+        Command::Help => println!("Help is coming (soon)!"),
+        Command::List => {
+            let mut socket = Socket::connect(SOCKET_PATH).unwrap();
+
+            let response = socket
+                .send_request(SocketRequest::ListApplications)
+                .unwrap();
+
+            match response {
+                SocketResponse::Success(SuccessResponse::ListApplications(apps)) => {
+                    if apps.is_empty() {
+                        println!("No apps!!")
+                    }
+
+                    for app in apps {
+                        println!(
+                            "YEAH! app {} with host {} and addr {}",
+                            app.name, app.hostname, app.address
+                        )
+                    }
+                }
+                _ => panic!("don't fail on me!"),
+            }
+        }
+        Command::Create { name } => {
+            println!("let's create app `{name}`");
+
+            let mut socket = Socket::connect(SOCKET_PATH).unwrap();
+
+            let response = socket
+                .send_request(SocketRequest::CreateApplication {
+                    hostname: format!("{name}.kaas.com"),
+                    name,
+                    address: "127.0.0.1:3301".parse().unwrap(),
+                })
+                .unwrap();
+
+            println!("got response {response:?}")
+        }
+    }
+
+    // let response = match socket.send_request(SocketRequest::ListApplications) {
+    //     Ok(r) => r,
+    //     Err(error) => {
+    //         print_error("failed to send request", Some(&error.to_string()));
+    //         return ExitCode::FAILURE;
+    //     }
+    // };
+
+    // println!("Response to greeting = {response:?}");
 
     ExitCode::SUCCESS
 }
