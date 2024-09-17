@@ -1,4 +1,13 @@
 {
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nil",
+  "nix.serverSettings": {
+    "nil": {
+      "formatting": {
+        "command": ["alejandra"]
+      }
+    }
+  },
   "rust-analyzer.check.extraArgs": [
     "--target-dir",
     "${workspaceFolder}/target/check"
