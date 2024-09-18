@@ -8,7 +8,7 @@ pub struct SocketMessage {
     pub request: SocketRequest,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SocketRequest {
     CreateApplication {
         name: String,
@@ -36,12 +36,13 @@ pub struct SocketReply {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum SocketResponse {
-    Success(SuccessResponse),
-    Failure(FailureReason),
+    Success(Requested),
+    Failure(Reason),
+    ConnectionClosed,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum SuccessResponse {
+pub enum Requested {
     ListApplications(Vec<Application>),
     CreatedApplication { name: String },
     GotApplication(Application),
@@ -50,7 +51,7 @@ pub enum SuccessResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum FailureReason {
+pub enum Reason {
     ApplicationNotFound,
     HostnameInUse,
     NameInUse,

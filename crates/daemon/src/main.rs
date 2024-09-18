@@ -1,17 +1,21 @@
 mod configuration;
+mod handlers;
+mod server;
+mod shutdown;
 mod socket;
+mod startup;
 
 use configuration::Configuration;
-use sail_core::{
-    configuration::Application,
-    socket::{FailureReason, SocketReply, SocketRequest, SocketResponse, SuccessResponse},
-};
-use socket::Socket;
+use shutdown::setup_shutdown_listener;
+use startup::{start_server_handler, start_socket_handler};
 use std::{process::ExitCode, sync::Arc};
+use tokio::time::{sleep, Duration};
 use tracing::{error, info, info_span, Instrument, Level};
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let mut failure = false;
+
     tracing_subscriber::fmt()
         .with_target(false)
         .with_max_level(Level::TRACE)
@@ -19,81 +23,64 @@ async fn main() -> ExitCode {
 
     info!("starting up...");
 
+    let (shutdown_signal, request_shutdown) = setup_shutdown_listener();
+
     let configuration = Arc::new(Configuration::load());
 
     info!("loaded configuration: {:?}", configuration.get());
 
-    let mut socket = match Socket::attach() {
-        Ok(socket) => socket,
+    let socket_task_handle = tokio::spawn(
+        start_socket_handler(
+            configuration.clone(),
+            shutdown_signal.clone(),
+            request_shutdown,
+        )
+        .instrument(info_span!("socket")),
+    );
+
+    match start_server_handler(configuration, shutdown_signal)
+        .instrument(info_span!("server"))
+        .await
+    {
+        Ok(handle) => {
+            // We only get here after the server connection loop inside the
+            // `start_server_handler` function has been broken. This happens
+            // because shutdown signal was received.
+
+            // Now, we allow the server to close its connections
+            // gracefully.
+
+            info!("server has stopped, waiting for all current connections to be closed");
+
+            tokio::select! {
+                _ = handle.shutdown() => {
+                    info!("all connections gracefully closed");
+                },
+                _ = sleep(Duration::from_secs(10)) => {
+                    error!("timed out wait for all connections to close");
+                }
+            }
+        }
         Err(error) => {
-            error!("{error}");
-            return ExitCode::FAILURE;
+            // Server stopped due to critical problem.
+            failure = true;
+
+            error!("server experienced critical failure: {error:?}");
         }
     };
 
-    let span = info_span!("socket");
-    let guard = span.enter();
-    while let Some(mut connection) = socket.accept().await {
-        let configuration = configuration.clone();
-        tokio::spawn(
-            async move {
-                // Wait for incoming messages over the connection, then handle their request,
-                // and reply with an appropriate response.
-                while let Some(message) = connection.next_message().await {
-                    info!(
-                        "received message #{} with request {:?}",
-                        message.id, message.request
-                    );
-
-                    let response = match message.request {
-                        SocketRequest::ListApplications => SocketResponse::Success(
-                            SuccessResponse::ListApplications(configuration.get().applications),
-                        ),
-
-                        SocketRequest::CreateApplication {
-                            name,
-                            hostname,
-                            address,
-                        } => {
-                            let mut settings = configuration.get();
-
-                            if settings.applications.iter().any(|app| app.name == name) {
-                                SocketResponse::Failure(FailureReason::NameInUse)
-                            } else {
-                                settings.applications.push(Application {
-                                    name: name.clone(),
-                                    hostname,
-                                    address,
-                                });
-
-                                configuration.set(settings);
-
-                                SocketResponse::Success(SuccessResponse::CreatedApplication {
-                                    name,
-                                })
-                            }
-                        }
-
-                        _ => SocketResponse::Failure(FailureReason::Todo),
-                    };
-
-                    info!(
-                        "replying to message #{} with response {:?}",
-                        message.id, response
-                    );
-
-                    connection
-                        .reply(SocketReply {
-                            regarding: message.id,
-                            response,
-                        })
-                        .await
-                }
-            }
-            .instrument(span.clone()),
-        );
+    if let Err(error) = socket_task_handle.await {
+        error!("failed to complete socket handler task: {error:?}");
+        failure = true
+    } else {
+        info!("successfully stopped the socket handler")
     }
-    drop(guard);
 
-    ExitCode::SUCCESS
+    info!("shutting down...");
+
+    if failure {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

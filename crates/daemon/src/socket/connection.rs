@@ -1,8 +1,10 @@
-use sail_core::socket::{SocketMessage, SocketReply};
+use std::u8;
+
+use sail_core::socket::{SocketMessage, SocketReply, SocketResponse};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
     net::{
-        unix::{OwnedReadHalf, OwnedWriteHalf},
+        unix::{OwnedReadHalf, OwnedWriteHalf, SocketAddr},
         UnixStream,
     },
 };
@@ -11,14 +13,16 @@ use tracing::error;
 pub struct SocketConnection {
     reader: Lines<BufReader<OwnedReadHalf>>,
     writer: OwnedWriteHalf,
+    pub address: SocketAddr,
 }
 
 impl SocketConnection {
-    pub fn new(stream: UnixStream) -> Self {
+    pub fn new(stream: UnixStream, address: SocketAddr) -> Self {
         let (reader, writer) = stream.into_split();
         Self {
             reader: BufReader::new(reader).lines(),
             writer,
+            address,
         }
     }
 
@@ -33,6 +37,15 @@ impl SocketConnection {
             },
             Err(error) => {
                 error!("failed to read from the socket: {error:?}");
+
+                // If there is an issue with reading from the socket, we should
+                // close the connection.
+                self.reply(SocketReply {
+                    regarding: u8::MAX,
+                    response: SocketResponse::ConnectionClosed,
+                })
+                .await;
+
                 return None;
             }
         }

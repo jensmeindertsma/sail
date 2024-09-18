@@ -1,6 +1,6 @@
 mod connection;
 
-use connection::SocketConnection;
+pub use connection::SocketConnection;
 use core::fmt::{self, Formatter};
 use std::{
     env::{self, VarError},
@@ -8,22 +8,23 @@ use std::{
     os::fd::FromRawFd,
 };
 use tokio::{io, net::UnixListener};
-use tracing::{error, info};
 
 pub struct Socket {
     listener: UnixListener,
 }
 
 impl Socket {
-    pub fn attach() -> Result<Self, SocketError> {
-        let var = env::var("LISTEN_FDS").map_err(|e| SocketError::BadEnvironment(e))?;
+    pub fn attach() -> Result<Self, SocketAttachmentError> {
+        let var = env::var("LISTEN_FDS").map_err(|e| SocketAttachmentError::BadEnvironment(e))?;
 
         let fd_count: i32 = var
             .parse()
-            .map_err(|e| SocketError::InvalidFileDescriptor(e))?;
+            .map_err(|e| SocketAttachmentError::InvalidFileDescriptor(e))?;
 
         if fd_count != 1 {
-            return Err(SocketError::UnexpectedFileDescriptorCount(fd_count));
+            return Err(SocketAttachmentError::UnexpectedFileDescriptorCount(
+                fd_count,
+            ));
         }
 
         // SAFETY: this file descriptor comes from systemd
@@ -32,37 +33,31 @@ impl Socket {
 
         std_listener
             .set_nonblocking(true)
-            .map_err(|e| SocketError::ConversionFailure(e))?;
+            .map_err(|e| SocketAttachmentError::ConversionFailure(e))?;
 
         Ok(Self {
             listener: UnixListener::from_std(std_listener)
-                .map_err(|e| SocketError::ConversionFailure(e))?,
+                .map_err(|e| SocketAttachmentError::ConversionFailure(e))?,
         })
     }
 
-    pub async fn accept(&mut self) -> Option<SocketConnection> {
-        match self.listener.accept().await {
-            Ok((stream, socket_address)) => {
-                info!("accepting new socket connection from {socket_address:?}");
-                return Some(SocketConnection::new(stream));
-            }
-            Err(error) => {
-                error!("socket listener failed to accept new connection: {error:?}");
-                return None;
-            }
-        };
+    pub async fn accept(&mut self) -> Result<SocketConnection, io::Error> {
+        self.listener
+            .accept()
+            .await
+            .map(|(stream, address)| SocketConnection::new(stream, address))
     }
 }
 
 #[derive(Debug)]
-pub enum SocketError {
+pub enum SocketAttachmentError {
     BadEnvironment(VarError),
     ConversionFailure(io::Error),
     InvalidFileDescriptor(ParseIntError),
     UnexpectedFileDescriptorCount(i32),
 }
 
-impl fmt::Display for SocketError {
+impl fmt::Display for SocketAttachmentError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadEnvironment(error) => match error {

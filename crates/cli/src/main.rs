@@ -3,7 +3,7 @@ mod socket;
 
 use command::Command;
 use owo_colors::OwoColorize;
-use sail_core::socket::{SocketRequest, SocketResponse, SuccessResponse};
+use sail_core::socket::{Requested, SocketRequest, SocketResponse};
 use socket::Socket;
 use std::{env, process::ExitCode};
 
@@ -31,7 +31,7 @@ fn main() -> ExitCode {
                 .unwrap();
 
             match response {
-                SocketResponse::Success(SuccessResponse::ListApplications(apps)) => {
+                SocketResponse::Success(Requested::ListApplications(apps)) => {
                     if apps.is_empty() {
                         println!("No apps!!")
                     }
