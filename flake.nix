@@ -24,6 +24,7 @@
             packages = [
               alejandra
               bash
+              cargo-edit
               cargo-nextest
               just
               nil

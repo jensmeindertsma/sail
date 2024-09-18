@@ -9,6 +9,5 @@ name = "sail"
 
 [dependencies]
 owo-colors.workspace = true
-rand.workspace = true
 sail_core = { path = "../core" }
 serde_json.workspace = true
