@@ -47,13 +47,10 @@ pub async fn start_socket_handler(
 
                     tokio::spawn(
                         async move {
-                            let mut handler = SocketHandler::new(configuration.clone());
+                            let mut handler = SocketHandler::new(configuration);
 
-                            let _ = handler
-                                .serve_connection(connection)
-                                .instrument(info_span!("handler"))
-                                .await;
-                        }
+                            handler.serve_connection(connection).await;
+                        }.instrument(info_span!("handler"))
                     );
                 }
                 Err(error) => {

@@ -6,6 +6,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use tracing::info;
 
 #[derive(Clone)]
 pub struct ServerHandler;
@@ -27,6 +28,8 @@ impl tower::Service<ServerRequest> for ServerHandler {
 
     fn call(&mut self, request: ServerRequest) -> Self::Future {
         // TODO: actual implementation of request forwarding based on headers
+
+        info!("handling request to {}", request.uri());
 
         ServerHandlerFuture { request }
     }
