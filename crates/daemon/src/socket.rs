@@ -4,6 +4,7 @@ pub use connection::SocketConnection;
 use core::fmt::{self, Formatter};
 use std::{
     env::{self, VarError},
+    error::Error,
     num::ParseIntError,
     os::fd::FromRawFd,
 };
@@ -15,11 +16,11 @@ pub struct Socket {
 
 impl Socket {
     pub fn attach() -> Result<Self, SocketAttachmentError> {
-        let var = env::var("LISTEN_FDS").map_err(|e| SocketAttachmentError::BadEnvironment(e))?;
+        let var = env::var("LISTEN_FDS").map_err(SocketAttachmentError::BadEnvironment)?;
 
         let fd_count: i32 = var
             .parse()
-            .map_err(|e| SocketAttachmentError::InvalidFileDescriptor(e))?;
+            .map_err(SocketAttachmentError::InvalidFileDescriptor)?;
 
         if fd_count != 1 {
             return Err(SocketAttachmentError::UnexpectedFileDescriptorCount(
@@ -33,11 +34,11 @@ impl Socket {
 
         std_listener
             .set_nonblocking(true)
-            .map_err(|e| SocketAttachmentError::ConversionFailure(e))?;
+            .map_err(SocketAttachmentError::ConversionFailure)?;
 
         Ok(Self {
             listener: UnixListener::from_std(std_listener)
-                .map_err(|e| SocketAttachmentError::ConversionFailure(e))?,
+                .map_err(SocketAttachmentError::ConversionFailure)?,
         })
     }
 
@@ -70,3 +71,5 @@ impl fmt::Display for SocketAttachmentError {
         }
     }
 }
+
+impl Error for SocketAttachmentError {}

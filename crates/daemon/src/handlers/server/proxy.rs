@@ -19,7 +19,7 @@ pub async fn proxy_request(
 
     let (mut sender, connection) = hyper::client::conn::http1::handshake(io)
         .await
-        .map_err(|e| ProxyError::Handshake(e))?;
+        .map_err(ProxyError::Handshake)?;
 
     tokio::spawn(
         async move {
@@ -35,7 +35,7 @@ pub async fn proxy_request(
     sender
         .send_request(request)
         .await
-        .map_err(|e| ProxyError::SendRequest(e))
+        .map_err(ProxyError::SendRequest)
 }
 
 #[derive(Debug)]

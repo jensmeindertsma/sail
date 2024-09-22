@@ -24,6 +24,12 @@ impl Registry {
     }
 }
 
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 async fn hello_world() -> Html<&'static str> {
     Html("<h1>Registry says 'Hello, World!'</h1>")
 }

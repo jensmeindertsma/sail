@@ -35,21 +35,20 @@ impl Socket {
             .write_all(
                 format!(
                     "{}\n",
-                    serde_json::to_string(&message)
-                        .map_err(|e| SocketError::FailedSerialization(e))?
+                    serde_json::to_string(&message).map_err(SocketError::FailedSerialization)?
                 )
                 .as_bytes(),
             )
-            .map_err(|e| SocketError::WriteFailure(e))?;
+            .map_err(SocketError::WriteFailure)?;
 
         let reply: SocketReply = serde_json::from_str(
             &self
                 .reader
                 .next()
                 .ok_or(SocketError::NoReply)?
-                .map_err(|e| SocketError::ReadFailure(e))?,
+                .map_err(SocketError::ReadFailure)?,
         )
-        .map_err(|e| SocketError::FailedDeserialization(e))?;
+        .map_err(SocketError::FailedDeserialization)?;
 
         if reply.regarding != message.id {
             return Err(SocketError::ReplyMismatch);

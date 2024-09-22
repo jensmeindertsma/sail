@@ -29,9 +29,7 @@ impl SocketHandler {
                 message.id, message.request
             );
 
-            let response = match self.call(message.request).await {
-                Ok(response) => response,
-            };
+            let Ok(response) = self.call(message.request).await;
 
             info!(
                 "replying to message #{} with response {:?}",

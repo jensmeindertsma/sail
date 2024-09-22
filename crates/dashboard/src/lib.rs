@@ -24,6 +24,12 @@ impl Dashboard {
     }
 }
 
+impl Default for Dashboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 async fn hello_world() -> Html<&'static str> {
     Html("<h1>Dashboard says 'Hello, World!'</h1>")
 }

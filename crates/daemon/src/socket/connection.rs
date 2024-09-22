@@ -1,5 +1,3 @@
-use std::u8;
-
 use sail_core::socket::{SocketMessage, SocketReply, SocketResponse};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
@@ -32,7 +30,7 @@ impl SocketConnection {
                 Ok(message) => message,
                 Err(error) => {
                     error!("failed to deserialize incoming message: {error}");
-                    return None;
+                    None
                 }
             },
             Err(error) => {
@@ -46,7 +44,7 @@ impl SocketConnection {
                 })
                 .await;
 
-                return None;
+                None
             }
         }
     }

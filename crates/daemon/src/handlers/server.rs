@@ -147,8 +147,8 @@ impl Future for ServerHandlerFuture {
 }
 
 fn make_response(body: &str, status: StatusCode) -> hyper::Response<Full<Bytes>> {
-    let mut response = hyper::Response::new(Full::new(Bytes::from(body.to_owned())));
-
-    *response.status_mut() = status;
-    return response;
+    Response::builder()
+        .status(status)
+        .body(Full::new(Bytes::from(body.to_owned())))
+        .expect("constructing hyper response should not fail")
 }
