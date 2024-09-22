@@ -40,7 +40,7 @@ pub async fn start_server_handler(
                 Ok(connection) => {
                     info!("accepted new connection from {:?}", connection.address);
 
-                    let handler = ServerHandler::new();
+                    let handler = ServerHandler::new(configuration.clone());
 
                     let io = TokioIo::new(connection.stream);
                     let service = TowerToHyperService::new(handler);
@@ -56,7 +56,7 @@ pub async fn start_server_handler(
 
                 }
                 Err(error) => {
-                    error!("failed to accept new connection: {error:?}");
+                    error!("failed to accept new connection: {error}");
                     continue;
                 }
             }

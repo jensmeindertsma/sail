@@ -54,7 +54,7 @@ pub async fn start_socket_handler(
                     );
                 }
                 Err(error) => {
-                    error!("failed to accept new connection: {error:?}");
+                    error!("failed to accept new connection: {error}");
                     continue;
                 }
             }
@@ -73,7 +73,7 @@ impl fmt::Display for StartupFailure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::SocketAttachment(error) => {
-                write!(f, "failed to attach to socket: {error:?}")
+                write!(f, "failed to attach to socket: {error}")
             }
         }
     }

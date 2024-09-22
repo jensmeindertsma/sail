@@ -55,7 +55,7 @@ fn main() -> ExitCode {
                 .send_request(SocketRequest::CreateApplication {
                     hostname: format!("{name}.kaas.com"),
                     name,
-                    address: "127.0.0.1:3301".parse().unwrap(),
+                    address: "127.0.0.1:3123".parse().unwrap(),
                 })
                 .unwrap();
 

@@ -31,12 +31,12 @@ impl SocketConnection {
             Ok(maybe_line) => match serde_json::from_str(&maybe_line?) {
                 Ok(message) => message,
                 Err(error) => {
-                    error!("failed to deserialize incoming message: {error:?}");
+                    error!("failed to deserialize incoming message: {error}");
                     return None;
                 }
             },
             Err(error) => {
-                error!("failed to read from the socket: {error:?}");
+                error!("failed to read from the socket: {error}");
 
                 // If there is an issue with reading from the socket, we should
                 // close the connection.
@@ -55,7 +55,7 @@ impl SocketConnection {
         let serialized_reply = match serde_json::to_string(&reply) {
             Ok(string) => string,
             Err(error) => {
-                error!("failed to serialize outgoing reply: {error:?}");
+                error!("failed to serialize outgoing reply: {error}");
                 return;
             }
         };
@@ -65,7 +65,7 @@ impl SocketConnection {
             .write_all(format!("{serialized_reply}\n").as_bytes())
             .await
         {
-            error!("failed to write to the socket: {error:?}");
+            error!("failed to write to the socket: {error}");
         };
     }
 }

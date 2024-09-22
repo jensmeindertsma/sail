@@ -10,9 +10,8 @@ stop:
 start:
     sudo systemctl start sail    
 
-upgrade:
+install: stop
     cargo build
-    just stop
     sudo cp /home/jens/dev/sail/target/debug/sail /usr/local/bin/sail
     sudo cp /home/jens/dev/sail/target/debug/saild /usr/local/bin/saild
     just start
@@ -22,3 +21,6 @@ update:
     cargo clean
     cargo check
     just upgrade
+
+start-abc-server:
+    cargo run --bin abc_server

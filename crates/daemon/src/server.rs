@@ -1,6 +1,7 @@
 use crate::configuration::Configuration;
 use core::fmt::{self, Formatter};
 use std::{
+    error::Error,
     io,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -38,11 +39,13 @@ impl fmt::Display for ServerListenError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::BindFailure { error, port } => {
-                write!(f, "failed to bind to port {port}: {error:?}")
+                write!(f, "server failed to bind to port {port}: {error}")
             }
         }
     }
 }
+
+impl Error for ServerListenError {}
 
 pub struct ServerConnection {
     pub stream: TcpStream,

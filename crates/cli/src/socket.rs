@@ -73,18 +73,18 @@ impl fmt::Display for SocketError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::FailedDeserialization(error) => {
-                write!(f, "failed to deserialize reply: {error:?}")
+                write!(f, "failed to deserialize reply: {error}")
             }
             Self::FailedSerialization(error) => {
-                write!(f, "failed to serialize request: {error:?}")
+                write!(f, "failed to serialize request: {error}")
             }
             Self::NoReply => write!(f, "received no reply from daemon"),
             Self::ReadFailure(io_error) => {
-                write!(f, "failed to read from the socket: {io_error:?}")
+                write!(f, "failed to read from the socket: {io_error}")
             }
             Self::ReplyMismatch => write!(f, "incoming reply has ID mismatch"),
             Self::WriteFailure(io_error) => {
-                write!(f, "failed to write to the socket: {io_error:?}")
+                write!(f, "failed to write to the socket: {io_error}")
             }
         }
     }

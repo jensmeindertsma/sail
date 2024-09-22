@@ -65,12 +65,12 @@ async fn main() -> ExitCode {
             // Server stopped due to critical problem.
             failure = true;
 
-            error!("server experienced critical failure: {error:?}");
+            error!("server experienced critical failure: {error}");
         }
     };
 
     if let Err(error) = socket_task_handle.await {
-        error!("failed to complete socket handler task: {error:?}");
+        error!("failed to complete socket handler task: {error}");
         failure = true
     } else {
         info!("successfully stopped the socket handler")
