@@ -12,6 +12,11 @@ pub struct Server {
     listener: TcpListener,
 }
 
+pub struct ServerConnection {
+    pub stream: TcpStream,
+    pub address: SocketAddr,
+}
+
 impl Server {
     pub async fn listen(configuration: Arc<Configuration>) -> Result<Self, ServerListenError> {
         let port = configuration.get().server_port;
@@ -46,8 +51,3 @@ impl fmt::Display for ServerListenError {
 }
 
 impl Error for ServerListenError {}
-
-pub struct ServerConnection {
-    pub stream: TcpStream,
-    pub address: SocketAddr,
-}

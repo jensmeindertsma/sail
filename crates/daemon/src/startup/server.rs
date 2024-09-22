@@ -38,7 +38,8 @@ pub async fn start_server_handler(
 
             result = server.accept() => match result {
                 Ok(connection) => {
-                    info!("accepted new connection from {:?}", connection.address);
+                    let connection_address = connection.address;
+                    info!("accepted new connection from {}", connection_address.to_string());
 
                     let handler = ServerHandler::new(configuration.clone());
 
@@ -52,7 +53,7 @@ pub async fn start_server_handler(
 
                     let future = graceful_shutdown.watch(connection);
 
-                    tokio::spawn(future.instrument(info_span!("handler")));
+                    tokio::spawn(future.instrument(info_span!("handler", origin=connection_address.to_string())));
 
                 }
                 Err(error) => {

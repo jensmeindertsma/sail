@@ -10,16 +10,22 @@ pub async fn proxy_request(
     request: Request<Incoming>,
     address: SocketAddrV4,
 ) -> Result<Response<Incoming>, ProxyError> {
-    let stream = TcpStream::connect(address)
-        .await
-        .map_err(ProxyError::Connect)?;
+    let stream = TcpStream::connect(address).await.map_err(|e| {
+        error!(destination = address.to_string(), "failed to connect");
+        ProxyError::Connect(e)
+    })?;
+
     let io = TokioIo::new(stream);
 
-    info!("connecting to {address}");
+    info!("connected to {address}");
 
-    let (mut sender, connection) = hyper::client::conn::http1::handshake(io)
-        .await
-        .map_err(ProxyError::Handshake)?;
+    let (mut sender, connection) =
+        hyper::client::conn::http1::handshake(io)
+            .await
+            .map_err(|e| {
+                error!("handshake failed");
+                ProxyError::Handshake(e)
+            })?;
 
     tokio::spawn(
         async move {
@@ -30,12 +36,12 @@ pub async fn proxy_request(
         .in_current_span(),
     );
 
-    info!("forwarding request to {} to application", request.uri());
+    info!("sending request");
 
-    sender
-        .send_request(request)
-        .await
-        .map_err(ProxyError::SendRequest)
+    sender.send_request(request).await.map_err(|e| {
+        error!("error while sending request");
+        ProxyError::SendRequest(e)
+    })
 }
 
 #[derive(Debug)]

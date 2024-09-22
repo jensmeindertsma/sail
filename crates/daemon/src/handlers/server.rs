@@ -45,31 +45,30 @@ impl Service<ServerRequest> for ServerHandler {
         // TODO: actual implementation of request forwarding based on headers
 
         let Some(host) = request.headers().get("host") else {
-            error!(?request, "received bad request without Host header");
+            error!(?request, "request is missing Host header");
             return ServerHandlerFuture::BadRequest(request);
         };
 
         let Ok(host) = host.to_str() else {
-            error!(?request, "received bad request with non UTF-8 Host header");
+            error!(?request, "request has non UTF-8 Host header");
             return ServerHandlerFuture::BadRequest(request);
         };
 
-        info!(
-            version = ?request.version(),
-            host,
-            "handling request to {}",
-            request.uri()
-        );
+        info!(host, uri = request.uri().to_string(), version = ?request.version());
 
         let settings = self.configuration.get();
 
         match host {
             "sail.jensmeindertsma.com" => {
+                info!("forwarding request to dashboard");
+
                 let mut dashboard = Dashboard::new();
 
                 ServerHandlerFuture::Dashboard(dashboard.call(request))
             }
             "registry.jensmeindertsma.com" => {
+                info!("forwarding request to registry");
+
                 let mut registry = Registry::new();
 
                 ServerHandlerFuture::Registry(registry.call(request))
@@ -81,6 +80,11 @@ impl Service<ServerRequest> for ServerHandler {
                     .iter()
                     .find(|app| app.hostname == host)
                 {
+                    info!(
+                        "request is to application `{}`, proxying request to {}",
+                        app.name,
+                        app.address.to_string(),
+                    );
                     ServerHandlerFuture::Proxy(Box::pin(proxy_request(request, app.address)))
                 } else {
                     error!(
@@ -123,9 +127,12 @@ impl Future for ServerHandlerFuture {
                 .map(|result| result.map(|response| response.map(Body::Axum))),
 
             Projected::Proxy(future) => future.poll(context).map(|result| match result {
-                Ok(response) => Ok(response.map(Body::Incoming)),
-                Err(proxy_error) => {
-                    error!("proxy returned error: {proxy_error}");
+                Ok(response) => {
+                    info!("proxy returned response");
+                    Ok(response.map(Body::Incoming))
+                }
+                Err(_proxy_error) => {
+                    error!(status = 502, "proxy failed, responding with error page");
                     Ok(
                         make_response("502 Bad Gateway (proxy error)\n", StatusCode::BAD_GATEWAY)
                             .map(Body::Complete),

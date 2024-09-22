@@ -24,17 +24,11 @@ impl SocketHandler {
 
     pub async fn serve_connection(&mut self, mut connection: SocketConnection) {
         while let Some(message) = connection.next_message().await {
-            info!(
-                "received message #{} with request {:?}",
-                message.id, message.request
-            );
+            info!(id = message.id, "request = {:?}", message.request);
 
             let Ok(response) = self.call(message.request).await;
 
-            info!(
-                "replying to message #{} with response {:?}",
-                message.id, response
-            );
+            info!(id = message.id, "response = {:?}", response);
 
             connection
                 .reply(SocketReply {
@@ -91,9 +85,15 @@ impl Future for SocketHandlerFuture {
                 } else {
                     settings.applications.push(Application {
                         name: name.clone(),
-                        hostname,
+                        hostname: hostname.clone(),
                         address,
                     });
+
+                    info!(
+                        hostname,
+                        address = address.to_string(),
+                        "created application `{name}`",
+                    );
 
                     self.configuration.set(settings);
 

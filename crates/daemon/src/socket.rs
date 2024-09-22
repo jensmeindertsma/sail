@@ -46,7 +46,8 @@ impl Socket {
         self.listener
             .accept()
             .await
-            .map(|(stream, address)| SocketConnection::new(stream, address))
+            // Ignore the address as it always seems to be `(unnamed)`
+            .map(|(stream, _address)| SocketConnection::new(stream))
     }
 }
 

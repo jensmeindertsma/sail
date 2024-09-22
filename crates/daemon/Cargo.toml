@@ -19,6 +19,7 @@ hyper-util = { workspace = true, features = [
     "tokio",
 ] }
 pin-project.workspace = true
+rand.workspace = true
 sail_core = { path = "../core" }
 sail_dashboard = { path = "../dashboard" }
 sail_registry = { path = "../registry" }

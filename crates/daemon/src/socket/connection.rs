@@ -2,7 +2,7 @@ use sail_core::socket::{SocketMessage, SocketReply, SocketResponse};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
     net::{
-        unix::{OwnedReadHalf, OwnedWriteHalf, SocketAddr},
+        unix::{OwnedReadHalf, OwnedWriteHalf},
         UnixStream,
     },
 };
@@ -11,16 +11,14 @@ use tracing::error;
 pub struct SocketConnection {
     reader: Lines<BufReader<OwnedReadHalf>>,
     writer: OwnedWriteHalf,
-    pub address: SocketAddr,
 }
 
 impl SocketConnection {
-    pub fn new(stream: UnixStream, address: SocketAddr) -> Self {
+    pub fn new(stream: UnixStream) -> Self {
         let (reader, writer) = stream.into_split();
         Self {
             reader: BufReader::new(reader).lines(),
             writer,
-            address,
         }
     }
 

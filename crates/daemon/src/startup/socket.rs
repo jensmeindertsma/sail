@@ -41,7 +41,9 @@ pub async fn start_socket_handler(
 
             result = socket.accept() => match result {
                 Ok(connection) => {
-                    info!("accepted new connection from {:?}", connection.address);
+                    let connection_id: u8 = rand::random();
+
+                    info!(id=connection_id, "accepted new connection");
 
                     let configuration = configuration.clone();
 
@@ -50,7 +52,7 @@ pub async fn start_socket_handler(
                             let mut handler = SocketHandler::new(configuration);
 
                             handler.serve_connection(connection).await;
-                        }.instrument(info_span!("handler"))
+                        }.instrument(info_span!("handler", id=connection_id))
                     );
                 }
                 Err(error) => {
