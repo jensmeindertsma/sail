@@ -27,6 +27,24 @@ fn main() -> ExitCode {
 
     match command {
         Command::Help => println!("Help is coming (soon)!"),
+        Command::SetDashboardHost(host) => {
+            let mut socket = Socket::connect(SOCKET_PATH).unwrap();
+
+            let response = socket
+                .send_request(SocketRequest::EditDashboardHost { hostname: host })
+                .unwrap();
+
+            dbg!(&response);
+        }
+        Command::SetRegistryHost(host) => {
+            let mut socket = Socket::connect(SOCKET_PATH).unwrap();
+
+            let response = socket
+                .send_request(SocketRequest::EditRegistryHost { hostname: host })
+                .unwrap();
+
+            dbg!(&response);
+        }
         Command::List => {
             let mut socket = Socket::connect(SOCKET_PATH).unwrap();
 
@@ -68,16 +86,6 @@ fn main() -> ExitCode {
         }
     }
 
-    // let response = match socket.send_request(SocketRequest::ListApplications) {
-    //     Ok(r) => r,
-    //     Err(error) => {
-    //         print_error("failed to send request", Some(&error.to_string()));
-    //         return ExitCode::FAILURE;
-    //     }
-    // };
-
-    // println!("Response to greeting = {response:?}");
-
     ExitCode::SUCCESS
 }
 
@@ -97,5 +105,5 @@ fn prompt(property: &str) -> String {
 
     io::stdin().read_line(&mut answer).unwrap();
 
-    answer
+    answer.trim().to_owned()
 }

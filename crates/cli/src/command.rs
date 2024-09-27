@@ -4,6 +4,8 @@ pub enum Command {
     Create { name: String },
     Help,
     List,
+    SetDashboardHost(String),
+    SetRegistryHost(String),
 }
 
 impl Command {
@@ -25,6 +27,16 @@ impl Command {
                     .ok_or(CommandParseError::MissingCreateName)?;
 
                 Ok(Self::Create { name })
+            }
+            "set-dashboard-host" => {
+                let host = iterator.next().ok_or(CommandParseError::NoArguments)?;
+
+                Ok(Self::SetDashboardHost(host))
+            }
+            "set-registry-host" => {
+                let host = iterator.next().ok_or(CommandParseError::NoArguments)?;
+
+                Ok(Self::SetRegistryHost(host))
             }
             other => Err(CommandParseError::UnknownCommand(other.to_owned())),
         }
