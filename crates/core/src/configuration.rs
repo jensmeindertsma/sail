@@ -6,5 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Application {
     pub name: String,
     pub hostname: String,
-    pub address: SocketAddrV4,
+    // Sail will show a placeholder page if this is not set. This property is typically
+    // automatically set by Sail
+    pub address: Option<SocketAddrV4>,
 }

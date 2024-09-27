@@ -14,6 +14,12 @@ impl Configuration {
             settings: Mutex::new(Settings {
                 applications: Vec::new(),
                 server_port: 4250,
+                dashboard: DashboardSettings {
+                    hostname: "dashboard.jensmeindertsma.com".to_owned(),
+                },
+                registry: RegistrySettings {
+                    hostname: "registry.jensmeindertsma.com".to_owned(),
+                },
             }),
         }
     }
@@ -33,4 +39,16 @@ impl Configuration {
 pub struct Settings {
     pub applications: Vec<Application>,
     pub server_port: u16,
+    pub dashboard: DashboardSettings,
+    pub registry: RegistrySettings,
+}
+
+#[derive(Clone, Debug)]
+pub struct DashboardSettings {
+    pub hostname: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct RegistrySettings {
+    pub hostname: String,
 }

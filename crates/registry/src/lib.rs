@@ -1,14 +1,13 @@
-use std::{
-    convert::Infallible,
-    task::{Context, Poll},
-};
-
 use axum::{
     body::HttpBody,
     http::Request,
     response::{Html, Response},
     routing::{future::RouteFuture, get},
     Router,
+};
+use std::{
+    convert::Infallible,
+    task::{Context, Poll},
 };
 use tower::Service;
 

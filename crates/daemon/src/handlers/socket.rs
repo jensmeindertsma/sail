@@ -1,7 +1,7 @@
 use crate::{configuration::Configuration, socket::SocketConnection};
 use sail_core::{
     configuration::Application,
-    socket::{Reason, Requested, SocketReply, SocketRequest, SocketResponse},
+    socket::{Failure, SocketReply, SocketRequest, SocketResponse, Success},
 };
 use std::{
     convert::Infallible,
@@ -68,40 +68,85 @@ impl Future for SocketHandlerFuture {
     type Output = Result<SocketResponse, Infallible>;
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        // This is always the latest copy as this method is invoked for
+        // every request as least once.
+        let mut settings = self.configuration.get();
         let response = match self.request.clone() {
-            SocketRequest::ListApplications => SocketResponse::Success(
-                Requested::ListApplications(self.configuration.get().applications),
-            ),
-
-            SocketRequest::CreateApplication {
-                name,
-                hostname,
-                address,
-            } => {
-                let mut settings = self.configuration.get();
-
+            SocketRequest::CreateApplication { name, hostname } => {
                 if settings.applications.iter().any(|app| app.name == name) {
-                    SocketResponse::Failure(Reason::NameInUse)
+                    Err(Failure::NameInUse)
                 } else {
-                    settings.applications.push(Application {
+                    let app = Application {
                         name: name.clone(),
                         hostname: hostname.clone(),
-                        address,
-                    });
+                        address: None,
+                    };
+                    info!(hostname, address = ?app.address, "created application `{name}`",);
 
-                    info!(
-                        hostname,
-                        address = address.to_string(),
-                        "created application `{name}`",
-                    );
-
+                    settings.applications.push(app);
                     self.configuration.set(settings);
 
-                    SocketResponse::Success(Requested::CreatedApplication { name })
+                    Ok(Success::CreatedApplication)
                 }
             }
+            SocketRequest::DeleteApplication { name } => {
+                settings.applications.retain(|app| app.name != name);
+                self.configuration.set(settings);
 
-            _ => SocketResponse::Failure(Reason::Todo),
+                Ok(Success::DeletedApplication)
+            }
+            SocketRequest::EditApplication {
+                name,
+                new_name,
+                new_hostname,
+            } => {
+                settings.applications = settings
+                    .applications
+                    .into_iter()
+                    .map(|app| {
+                        if app.name == name {
+                            Application {
+                                name: new_name.clone().unwrap_or(app.name),
+                                hostname: new_hostname.clone().unwrap_or(app.hostname),
+                                address: app.address,
+                            }
+                        } else {
+                            app
+                        }
+                    })
+                    .collect();
+                self.configuration.set(settings);
+
+                Ok(Success::EditedApplication)
+            }
+            SocketRequest::EditDashboardHost { hostname } => {
+                settings.dashboard.hostname = hostname;
+                self.configuration.set(settings);
+                Ok(Success::EditedDashboardHost)
+            }
+            SocketRequest::EditRegistryHost { hostname } => {
+                settings.registry.hostname = hostname;
+                self.configuration.set(settings);
+                Ok(Success::EditedRegistryHost)
+            }
+            SocketRequest::GetApplication { name } => {
+                if let Some(app) = settings
+                    .applications
+                    .into_iter()
+                    .find(|app| app.name == name)
+                {
+                    Ok(Success::GetApplication(app))
+                } else {
+                    Err(Failure::ApplicationNotFound)
+                }
+            }
+            SocketRequest::GetApplications => Ok(Success::GetApplications(settings.applications)),
+            SocketRequest::GetDashboardHost => Ok(Success::GetDashboardHost {
+                hostname: settings.dashboard.hostname,
+            }),
+            SocketRequest::GetRegistryHost => Ok(Success::GetRegistryHost {
+                hostname: settings.registry.hostname,
+            }),
         };
 
         Poll::Ready(Ok(response))

@@ -10,6 +10,7 @@ use hyper::{
 };
 use pin_project::pin_project;
 use proxy::{proxy_request, ProxyError};
+use sail_core::configuration::Application;
 use sail_dashboard::{Dashboard, DashboardFuture};
 use sail_registry::{Registry, RegistryFuture};
 use std::{
@@ -59,14 +60,14 @@ impl Service<ServerRequest> for ServerHandler {
         let settings = self.configuration.get();
 
         match host {
-            "sail.jensmeindertsma.com" => {
+            host if host == settings.dashboard.hostname => {
                 info!("forwarding request to dashboard");
 
                 let mut dashboard = Dashboard::new();
 
                 ServerHandlerFuture::Dashboard(dashboard.call(request))
             }
-            "registry.jensmeindertsma.com" => {
+            host if host == settings.registry.hostname => {
                 info!("forwarding request to registry");
 
                 let mut registry = Registry::new();
@@ -77,15 +78,23 @@ impl Service<ServerRequest> for ServerHandler {
             host => {
                 if let Some(app) = settings
                     .applications
-                    .iter()
+                    .into_iter()
                     .find(|app| app.hostname == host)
                 {
-                    info!(
-                        "request is to application `{}`, proxying request to {}",
-                        app.name,
-                        app.address.to_string(),
-                    );
-                    ServerHandlerFuture::Proxy(Box::pin(proxy_request(request, app.address)))
+                    if let Some(address) = app.address {
+                        info!(
+                            "request is to application `{}`, proxying request to {}",
+                            app.name, address,
+                        );
+                        ServerHandlerFuture::Proxy(Box::pin(proxy_request(request, address)))
+                    } else {
+                        info!(
+                            "request is to application `{}`, it has no address!",
+                            app.name,
+                        );
+
+                        ServerHandlerFuture::Placeholder(request, app)
+                    }
                 } else {
                     error!(
                         host = ?request.headers().get("host"),
@@ -106,6 +115,7 @@ impl Service<ServerRequest> for ServerHandler {
 pub enum ServerHandlerFuture {
     BadRequest(ServerRequest),
     Dashboard(#[pin] DashboardFuture),
+    Placeholder(ServerRequest, Application),
     Proxy(#[pin] Pin<Box<dyn Future<Output = Result<Response<Incoming>, ProxyError>> + Send>>),
     Registry(#[pin] RegistryFuture),
     UnknownHost(ServerRequest),
@@ -126,6 +136,11 @@ impl Future for ServerHandlerFuture {
                 .poll(context)
                 .map(|result| result.map(|response| response.map(Body::Axum))),
 
+            Projected::Placeholder(_request, app) => Poll::Ready(Ok(make_response(
+                &format!("Placeholder page for app `{}`\n", app.name),
+                StatusCode::OK,
+            )
+            .map(Body::Complete))),
             Projected::Proxy(future) => future.poll(context).map(|result| match result {
                 Ok(response) => {
                     info!("proxy returned response");

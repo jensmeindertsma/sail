@@ -3,9 +3,13 @@ mod socket;
 
 use command::Command;
 use owo_colors::OwoColorize;
-use sail_core::socket::{Requested, SocketRequest, SocketResponse};
+use sail_core::socket::{Failure, SocketRequest, Success};
 use socket::Socket;
-use std::{env, process::ExitCode};
+use std::{
+    env,
+    io::{self, Write},
+    process::ExitCode,
+};
 
 const SOCKET_PATH: &str = "/run/sail.socket";
 
@@ -26,21 +30,16 @@ fn main() -> ExitCode {
         Command::List => {
             let mut socket = Socket::connect(SOCKET_PATH).unwrap();
 
-            let response = socket
-                .send_request(SocketRequest::ListApplications)
-                .unwrap();
+            let response = socket.send_request(SocketRequest::GetApplications).unwrap();
 
             match response {
-                SocketResponse::Success(Requested::ListApplications(apps)) => {
+                Ok(Success::GetApplications(apps)) => {
                     if apps.is_empty() {
                         println!("No apps!!")
                     }
 
                     for app in apps {
-                        println!(
-                            "YEAH! app {} with host {} and addr {}",
-                            app.name, app.hostname, app.address
-                        )
+                        println!("YEAH! app {} with host {}", app.name, app.hostname)
                     }
                 }
                 _ => panic!("don't fail on me!"),
@@ -51,15 +50,21 @@ fn main() -> ExitCode {
 
             let mut socket = Socket::connect(SOCKET_PATH).unwrap();
 
-            let response = socket
-                .send_request(SocketRequest::CreateApplication {
-                    hostname: format!("{name}.kaas.com"),
-                    name,
-                    address: "127.0.0.1:3123".parse().unwrap(),
-                })
-                .unwrap();
+            if let Err(Failure::NameInUse) = socket
+                .send_request(SocketRequest::GetApplication { name: name.clone() })
+                .unwrap()
+            {
+                eprintln!("name `{name}` is already in use ")
+            }
 
-            println!("got response {response:?}")
+            let hostname = prompt("hostname");
+
+            if let Ok(Success::CreatedApplication) = socket
+                .send_request(SocketRequest::CreateApplication { name, hostname })
+                .unwrap()
+            {
+                println!("created application :)")
+            }
         }
     }
 
@@ -82,4 +87,15 @@ fn print_error(message: &str, description: Option<&str>) {
     if let Some(description) = description {
         eprintln!("{} {}", "-->".bold().cyan(), description.italic())
     }
+}
+
+fn prompt(property: &str) -> String {
+    print!("{property}: ");
+    io::stdout().flush().unwrap();
+
+    let mut answer = String::new();
+
+    io::stdin().read_line(&mut answer).unwrap();
+
+    answer
 }

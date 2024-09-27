@@ -1,6 +1,5 @@
 use crate::configuration::Application;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddrV4;
 
 #[derive(Deserialize, Serialize)]
 pub struct SocketMessage {
@@ -13,19 +12,27 @@ pub enum SocketRequest {
     CreateApplication {
         name: String,
         hostname: String,
-        address: SocketAddrV4,
-    },
-    EditApplication {
-        name: String,
-        new: Application,
     },
     GetApplication {
         name: String,
     },
+    GetApplications,
+    EditApplication {
+        name: String,
+        new_name: Option<String>,
+        new_hostname: Option<String>,
+    },
     DeleteApplication {
         name: String,
     },
-    ListApplications,
+    GetDashboardHost,
+    GetRegistryHost,
+    EditDashboardHost {
+        hostname: String,
+    },
+    EditRegistryHost {
+        hostname: String,
+    },
 }
 
 #[derive(Deserialize, Serialize)]
@@ -34,25 +41,25 @@ pub struct SocketReply {
     pub response: SocketResponse,
 }
 
+pub type SocketResponse = Result<Success, Failure>;
+
 #[derive(Debug, Deserialize, Serialize)]
-pub enum SocketResponse {
-    Success(Requested),
-    Failure(Reason),
-    ConnectionClosed,
+pub enum Success {
+    CreatedApplication,
+    DeletedApplication,
+    EditedApplication,
+    EditedDashboardHost,
+    EditedRegistryHost,
+    GetApplication(Application),
+    GetApplications(Vec<Application>),
+    GetDashboardHost { hostname: String },
+    GetRegistryHost { hostname: String },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Requested {
-    ListApplications(Vec<Application>),
-    CreatedApplication { name: String },
-    GotApplication(Application),
-    EditedApplication { name: String },
-    DeletedApplication { name: String },
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Reason {
+pub enum Failure {
     ApplicationNotFound,
+    ConnectionClosed,
     HostnameInUse,
     NameInUse,
     Todo,

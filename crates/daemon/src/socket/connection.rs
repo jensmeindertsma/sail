@@ -1,4 +1,4 @@
-use sail_core::socket::{SocketMessage, SocketReply, SocketResponse};
+use sail_core::socket::{Failure, SocketMessage, SocketReply};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
     net::{
@@ -38,7 +38,7 @@ impl SocketConnection {
                 // close the connection.
                 self.reply(SocketReply {
                     regarding: u8::MAX,
-                    response: SocketResponse::ConnectionClosed,
+                    response: Err(Failure::ConnectionClosed),
                 })
                 .await;
 
