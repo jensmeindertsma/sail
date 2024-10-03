@@ -55,8 +55,6 @@ impl Service<ServerRequest> for ServerHandler {
             return ServerHandlerFuture::BadRequest(request);
         };
 
-        info!(host, uri = request.uri().to_string(), version = ?request.version());
-
         let settings = self.configuration.get();
 
         match host {

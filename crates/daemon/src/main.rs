@@ -27,7 +27,7 @@ async fn main() -> ExitCode {
 
     let configuration = Arc::new(Configuration::load());
 
-    info!("loaded configuration: {:?}", configuration.get());
+    info!("loaded configuration: {:#?}", configuration.get());
 
     let socket_task_handle = tokio::spawn(
         start_socket_handler(

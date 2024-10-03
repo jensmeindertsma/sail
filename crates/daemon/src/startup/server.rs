@@ -53,7 +53,7 @@ pub async fn start_server_handler(
 
                     let future = graceful_shutdown.watch(connection);
 
-                    tokio::spawn(future.instrument(info_span!("handler", origin=connection_address.to_string())));
+                    tokio::spawn(future.instrument(info_span!("handler")));
 
                 }
                 Err(error) => {

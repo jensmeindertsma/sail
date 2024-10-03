@@ -1,6 +1,6 @@
 use axum::{
     body::HttpBody,
-    http::Request,
+    http::{Request, StatusCode},
     response::{Html, Response},
     routing::{future::RouteFuture, get},
     Router,
@@ -10,6 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::Service;
+use tower_http::trace::TraceLayer;
 
 pub struct Registry {
     router: Router,
@@ -17,7 +18,16 @@ pub struct Registry {
 
 impl Registry {
     pub fn new() -> Self {
-        let router = Router::new().route("/", get(hello_world));
+        let router = Router::new()
+            .layer(TraceLayer::new_for_http().on_request(()))
+            .route(
+                "/v2/",
+                get((
+                    StatusCode::OK,
+                    Html("<h1>Registry API v2 is supported!</h1>"),
+                )),
+            )
+            .fallback((StatusCode::NOT_FOUND, Html("<h1>Not Found</h1>")));
 
         Self { router }
     }
@@ -27,10 +37,6 @@ impl Default for Registry {
     fn default() -> Self {
         Self::new()
     }
-}
-
-async fn hello_world() -> Html<&'static str> {
-    Html("<h1>Registry says 'Hello, World!'</h1>")
 }
 
 pub type RegistryFuture = RouteFuture<Infallible>;
