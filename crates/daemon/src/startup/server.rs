@@ -1,5 +1,4 @@
 use crate::{
-    configuration::Configuration,
     handlers::ServerHandler,
     server::{Server, ServerListenError},
     shutdown::ShutdownSignal,
@@ -10,6 +9,7 @@ use hyper_util::{
     server::{conn::auto::Builder, graceful::GracefulShutdown},
     service::TowerToHyperService,
 };
+use sail_core::configuration::Configuration;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info, info_span, Instrument};

@@ -1,11 +1,10 @@
-mod configuration;
 mod handlers;
 mod server;
 mod shutdown;
 mod socket;
 mod startup;
 
-use configuration::Configuration;
+use sail_core::configuration::Configuration;
 use shutdown::setup_shutdown_listener;
 use startup::{start_server_handler, start_socket_handler};
 use std::{process::ExitCode, sync::Arc};

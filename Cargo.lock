@@ -111,6 +111,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
 name = "bitflags"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -571,6 +577,8 @@ name = "sail_core"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -588,10 +596,10 @@ dependencies = [
  "sail_registry",
  "serde_json",
  "tokio",
- "toml",
  "tower 0.5.1",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -607,8 +615,14 @@ name = "sail_registry"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64",
+ "sail_core",
+ "serde",
+ "serde_json",
  "tower 0.5.1",
  "tower-http",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -948,6 +962,17 @@ name = "unicode-ident"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
+
+[[package]]
+name = "uuid"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
+dependencies = [
+ "getrandom",
+ "rand",
+ "serde",
+]
 
 [[package]]
 name = "valuable"

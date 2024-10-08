@@ -1,10 +1,10 @@
 use crate::{
-    configuration::Configuration,
     handlers::SocketHandler,
     shutdown::ShutdownSignal,
     socket::{Socket, SocketAttachmentError},
 };
 use core::fmt::{self, Formatter};
+use sail_core::configuration::Configuration;
 use std::sync::Arc;
 use tokio::sync::watch::{Receiver, Sender};
 use tracing::{error, info, info_span, Instrument};

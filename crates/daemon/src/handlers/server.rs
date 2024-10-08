@@ -1,7 +1,6 @@
 mod body;
 mod proxy;
 
-use crate::configuration::Configuration;
 use body::Body;
 use http_body_util::Full;
 use hyper::{
@@ -10,7 +9,7 @@ use hyper::{
 };
 use pin_project::pin_project;
 use proxy::{proxy_request, ProxyError};
-use sail_core::configuration::Application;
+use sail_core::configuration::{Application, Configuration};
 use sail_dashboard::{Dashboard, DashboardFuture};
 use sail_registry::{Registry, RegistryFuture};
 use std::{
@@ -68,7 +67,7 @@ impl Service<ServerRequest> for ServerHandler {
             host if host == settings.registry.hostname => {
                 info!("forwarding request to registry");
 
-                let mut registry = Registry::new();
+                let mut registry = Registry::new(self.configuration.clone());
 
                 ServerHandlerFuture::Registry(registry.call(request))
             }

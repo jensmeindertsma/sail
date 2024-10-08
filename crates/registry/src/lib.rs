@@ -1,12 +1,16 @@
+mod routes;
+
 use axum::{
     body::HttpBody,
-    http::{Request, StatusCode},
-    response::{Html, Response},
-    routing::{future::RouteFuture, get},
+    http::Request,
+    response::Response,
+    routing::{future::RouteFuture, get, patch, post, put},
     Router,
 };
+use sail_core::configuration::Configuration;
 use std::{
     convert::Infallible,
+    sync::Arc,
     task::{Context, Poll},
 };
 use tower::Service;
@@ -17,25 +21,24 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn new() -> Self {
+    pub fn new(configuration: Arc<Configuration>) -> Self {
         let router = Router::new()
-            .layer(TraceLayer::new_for_http().on_request(()))
+            .route("/v2/", get(routes::version_check))
+            .route("/v2/:name/blobs/uploads/", post(routes::initiate_upload))
+            .route("/v2/:name/blobs/uploads/:uuid", patch(routes::upload_blob))
             .route(
-                "/v2/",
-                get((
-                    StatusCode::OK,
-                    Html("<h1>Registry API v2 is supported!</h1>"),
-                )),
+                "/v2/:name/blobs/uploads/:uuid",
+                put(routes::complete_upload),
             )
-            .fallback((StatusCode::NOT_FOUND, Html("<h1>Not Found</h1>")));
+            .route(
+                "/v2/:name/manifests/:reference",
+                put(routes::upload_manifest),
+            )
+            .with_state(configuration)
+            .fallback(routes::not_found)
+            .layer(TraceLayer::new_for_http().on_request(()));
 
         Self { router }
-    }
-}
-
-impl Default for Registry {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

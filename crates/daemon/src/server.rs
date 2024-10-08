@@ -1,5 +1,5 @@
-use crate::configuration::Configuration;
 use core::fmt::{self, Formatter};
+use sail_core::configuration::Configuration;
 use std::{
     error::Error,
     io,

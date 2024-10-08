@@ -1,6 +1,6 @@
-use crate::{configuration::Configuration, socket::SocketConnection};
+use crate::socket::SocketConnection;
 use sail_core::{
-    configuration::Application,
+    configuration::{Application, Configuration},
     socket::{Failure, SocketReply, SocketRequest, SocketResponse, Success},
 };
 use std::{
@@ -12,6 +12,7 @@ use std::{
 };
 use tower::Service;
 use tracing::info;
+use uuid::Uuid;
 
 pub struct SocketHandler {
     configuration: Arc<Configuration>,
@@ -80,6 +81,7 @@ impl Future for SocketHandlerFuture {
                         name: name.clone(),
                         hostname: hostname.clone(),
                         address: None,
+                        token: Uuid::new_v4().to_string(),
                     };
                     info!(hostname, address = ?app.address, "created application `{name}`",);
 
@@ -109,6 +111,7 @@ impl Future for SocketHandlerFuture {
                                 name: new_name.clone().unwrap_or(app.name),
                                 hostname: new_hostname.clone().unwrap_or(app.hostname),
                                 address: app.address,
+                                token: app.token,
                             }
                         } else {
                             app
