@@ -1,13 +1,7 @@
 [package]
-name = "sail_cli"
-version = "0.1.0"
+name = "sail-cli"
 edition = "2021"
 
 [[bin]]
 name = "sail"
 path = "src/main.rs"
-
-[dependencies]
-owo-colors.workspace = true
-sail_core = { path = "../core" }
-serde_json.workspace = true
