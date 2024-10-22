@@ -13,12 +13,14 @@ jobs:
       - name: Compile project
         run: cargo build --release
 
+      - name: Prepare upload
+        run: |
+          mkdir files
+          mv -t files target/release/sail target/release/saild
+          mv -t files support/systemd/sail.service support/systemd/sail.socket
+
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: sail-release
-          path: |
-            target/release/sail
-            target/release/saild
-            support/systemd/sail.service
-            support/systemd/sail.socket
+          path: files
