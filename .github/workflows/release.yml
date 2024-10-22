@@ -13,17 +13,12 @@ jobs:
       - name: Compile project
         run: cargo build --release
 
-      - name: List build output
-        run: ls -lah ./target/release/
-
-      - name: Upload CLI binary
+      - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: cli
-          path: target/release/sail
-
-      - name: Upload daemon binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: daemon
-          path: target/release/saild
+          name: sail-release
+          path: |
+            target/release/sail
+            target/release/saild
+            support/systemd/sail.service
+            support/systemd/sail.socket
