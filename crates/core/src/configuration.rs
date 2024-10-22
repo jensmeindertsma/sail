@@ -3,49 +3,6 @@ use std::net::SocketAddrV4;
 use std::{fs, sync::Mutex};
 use tracing::error;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Settings {
-    pub applications: Vec<Application>,
-    pub server_port: u16,
-    pub dashboard: DashboardSettings,
-    pub registry: RegistrySettings,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DashboardSettings {
-    pub hostname: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RegistrySettings {
-    pub hostname: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Application {
-    pub name: String,
-    pub hostname: String,
-    // Sail will show a placeholder page if this is not set. This property is typically
-    // automatically set by Sail
-    pub address: Option<SocketAddrV4>,
-    pub token: String,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            applications: Vec::new(),
-            server_port: 4250,
-            dashboard: DashboardSettings {
-                hostname: String::from("sail.jensmeindertsma.com"),
-            },
-            registry: RegistrySettings {
-                hostname: String::from("registry.jensmeindertsma.com"),
-            },
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Configuration {
     settings: Mutex<Settings>,
@@ -92,4 +49,47 @@ impl Configuration {
         fs::write("/etc/sail/configuration.toml", serialized)
             .expect("writing configuration to disk should not fail");
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Settings {
+    pub applications: Vec<Application>,
+    pub server_port: u16,
+    pub dashboard: DashboardSettings,
+    pub registry: RegistrySettings,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Application {
+    pub name: String,
+    pub hostname: String,
+    // Sail will show a placeholder page if this is not set. This property is typically
+    // automatically set by Sail
+    pub address: Option<SocketAddrV4>,
+    pub token: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            applications: Vec::new(),
+            server_port: 4250,
+            dashboard: DashboardSettings {
+                hostname: String::from("sail.jensmeindertsma.com"),
+            },
+            registry: RegistrySettings {
+                hostname: String::from("registry.jensmeindertsma.com"),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DashboardSettings {
+    pub hostname: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RegistrySettings {
+    pub hostname: String,
 }

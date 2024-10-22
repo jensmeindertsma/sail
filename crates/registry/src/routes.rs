@@ -35,7 +35,7 @@ fn check_authorization(headers: HeaderMap, settings: Settings) -> Result<(), ()>
     let encoded = &header["Basic".len()..];
     info!("got basic header with token {encoded}");
 
-    let (app, token) = decode_token(encoded);
+    let (app, token) = decode_token(encoded)?;
 
     info!("app = {app}, token = {token}");
 
@@ -48,12 +48,12 @@ fn check_authorization(headers: HeaderMap, settings: Settings) -> Result<(), ()>
     Err(())
 }
 
-fn decode_token(encoded: &str) -> (String, String) {
+fn decode_token(encoded: &str) -> Result<(String, String), ()> {
     let decoded: String = String::from_utf8(BASE64_STANDARD.decode(encoded).unwrap()).unwrap();
 
-    let (app, token) = decoded.split_once(":").unwrap();
+    let (app, token) = decoded.split_once(":").ok_or(())?;
 
-    (app.to_owned(), token.to_owned())
+    Ok((app.to_owned(), token.to_owned()))
 }
 
 pub async fn version_check(
