@@ -13,7 +13,7 @@ jobs:
       - name: Compile project
         run: cargo build --release
 
-      - name: Prepare upload
+      - name: Prepare upload folder
         run: |
           mkdir files
           mv -t files target/release/sail target/release/saild
