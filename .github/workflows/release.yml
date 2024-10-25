@@ -3,7 +3,7 @@ on:
   release:
     types: [created]
 jobs:
-  build:
+  build-assets:
     runs-on: ubuntu-latest
     permissions:
       contents: write
