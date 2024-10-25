@@ -25,9 +25,10 @@ fi
 echo "(1) Downloading latest release"
 echo "(1a) fetching latest succesful release workflow details"
 
-LATEST_RELEASE=$(curl -s "$GITHUB_API/releases" | jq -r '[.[] | select(.prerelease==true)')
-LATEST_RUN_ID=$(echo "$LATEST_RUN" |  jq -r '.id')
-LATEST_VERSION=$(echo "$LATEST_RUN" | jq -r '.head_sha')
+LATEST_RELEASE=$(curl -s "$GITHUB_API/releases" | jq -r '[.[]][0]')
+LATEST_VERSION=$(echo "$LATEST_RELEASE" |  jq -r '.name')
+DOWNLOAD_NAME="sail-$LATEST_VERSION"
+DOWNLOAD_URL=$(echo "$LATEST_RELEASE" | jq -r '.assets[] | select(.name==\"\") | .id .assets[0].browser_download_url')
 
 if [ -z "$LATEST_RUN_ID" ]; then
   echo "error: no successful workflow run found!"
