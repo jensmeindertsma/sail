@@ -1,5 +1,5 @@
 [Unit]
-Description=Application deployment daemon
+Description=Application deployment system
 After=network-online.target sail.socket
 Wants=network-online.target
 Requires=sail.socket
