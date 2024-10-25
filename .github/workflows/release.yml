@@ -11,7 +11,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Compile project
+      - name: Build crates
         run: cargo build --release
 
       - name: Prepare assets
