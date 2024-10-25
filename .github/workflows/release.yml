@@ -1,10 +1,10 @@
 name: release
 on:
   push:
-    branches:
-      - main
+    tags:
+      - v*
 jobs:
-  upload:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -15,12 +15,16 @@ jobs:
 
       - name: Prepare upload folder
         run: |
-          mkdir files
-          mv -t files target/release/sail target/release/saild
-          mv -t files support/systemd/sail.service support/systemd/sail.socket
+          mkdir sail
+          cp target/release/sail sail/
+          cp target/release/saild sail/
+          cp support/systemd/sail.service sail/
+          cp support/systemd/sail.socket sail/
+          tar -czvf sail-${{ github.ref_name }}.tar.gz -C sail .
 
       - name: Upload binaries
-        uses: actions/upload-artifact@v4
+        uses: ncipollo/release-action@v1
         with:
-          name: sail-release
-          path: files
+          prerelease: true
+          makeLatest: true
+          artifacts: sail-${{ github.ref_name }}.tar.gz
