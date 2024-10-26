@@ -5,3 +5,6 @@ edition = "2021"
 [[bin]]
 name = "sail"
 path = "src/main.rs"
+
+[dependencies]
+nix = { workspace = true, features = ["user"] }

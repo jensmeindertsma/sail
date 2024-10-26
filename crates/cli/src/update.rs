@@ -1,3 +1,5 @@
-pub fn update() {
-    todo!("fetch latest version and propose upgrading Sail")
+use std::process::ExitCode;
+
+pub fn update() -> ExitCode {
+    todo!("fetch latest version and propose upgrading Sail");
 }
