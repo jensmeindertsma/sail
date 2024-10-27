@@ -5,7 +5,7 @@ use std::{
     process::{Command, ExitCode},
 };
 
-pub fn uninstall() -> ExitCode {
+pub fn uninstall() -> Result<(), UninstallError> {
     println!("Uninstalling....");
 
     if Uid::effective().is_root() {
@@ -106,5 +106,7 @@ pub fn uninstall() -> ExitCode {
         );
     }
 
-    ExitCode::SUCCESS
+    Ok(())
 }
+
+pub enum UninstallError {}

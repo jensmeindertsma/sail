@@ -1,19 +1,31 @@
-mod uninstall;
-mod update;
+mod command;
 
-use std::{env, process::Termination};
-use uninstall::uninstall;
-use update::update;
+use command::{Command, ParseError};
+use owo_colors::OwoColorize;
+use std::{
+    env,
+    process::{ExitCode, Termination},
+};
 
 fn main() -> impl Termination {
-    let mut arguments = env::args().skip(1);
+    let arguments = env::args().skip(1);
 
-    let command = arguments.next().expect("command should be provided");
+    let command = match Command::try_from_arguments(arguments) {
+        Ok(command) => command,
+        Err(parse_error) => {
+            let message = match parse_error {
+                ParseError::MissingCommandArgument => "no command was specified".to_owned(),
+                ParseError::UnknownCommand(command) => format!("unknown command `{command}`"),
+            };
 
-    match command.as_str() {
-        "uninstall" => uninstall(),
-        "update" => update(),
+            print_error(&message);
+            return ExitCode::FAILURE;
+        }
+    };
 
-        other => panic!("unknown command `{other}`"),
-    }
+    ExitCode::SUCCESS
+}
+
+fn print_error(message: &str) {
+    eprintln!("{}{} {}", "error".bold().red(), ":".bold(), message)
 }

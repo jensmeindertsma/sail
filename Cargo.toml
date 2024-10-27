@@ -4,3 +4,4 @@ members = ["crates/*"]
 
 [workspace.dependencies]
 nix = "0.29.0"
+owo-colors = "4.1.0"

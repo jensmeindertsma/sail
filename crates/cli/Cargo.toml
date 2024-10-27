@@ -8,3 +8,4 @@ path = "src/main.rs"
 
 [dependencies]
 nix = { workspace = true, features = ["user"] }
+owo-colors.workspace = true
