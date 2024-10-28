@@ -12,8 +12,8 @@ fn main() -> impl Termination {
 
     let command = match Command::try_from_arguments(arguments) {
         Ok(command) => command,
-        Err(parse_error) => {
-            let message = match parse_error {
+        Err(error) => {
+            let message = match error {
                 ParseError::MissingCommandArgument => "no command was specified".to_owned(),
                 ParseError::UnknownCommand(command) => format!("unknown command `{command}`"),
             };
@@ -22,6 +22,12 @@ fn main() -> impl Termination {
             return ExitCode::FAILURE;
         }
     };
+
+    match command {
+        Command::Configure { setting, value } => configure(setting, value),
+        Command::Uninstall => uninstall(),
+        Command::Update => update(),
+    }
 
     ExitCode::SUCCESS
 }

@@ -9,11 +9,18 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn try_from_arguments(iterator: impl Iterator<Item = String>) -> Result<Self, ParseError> {
-        let command_argument = iterator.next().ok_or(ParseError::MissingCommandArgument)?;
+    pub fn try_from_arguments(arguments: impl Iterator<Item = String>) -> Result<Self, ParseError> {
+        let command_argument = arguments.next().ok_or(ParseError::MissingCommandArgument)?;
 
         match command_argument.as_str() {
-            "configure" => {}
+            "configure" => Ok(Self::Configure {
+                setting: arguments
+                    .next()
+                    .ok_or(ConfigureError::MissingSettingArgument)?,
+                value: arguments
+                    .next()
+                    .ok_or(ConfigureError::MissingValueArgument)?,
+            }),
             "uninstall" => Ok(Self::Uninstall),
             "update" => Ok(Self::Update),
             _other => Err(ParseError::UnknownCommand(command_argument)),

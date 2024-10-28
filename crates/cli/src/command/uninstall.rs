@@ -1,9 +1,5 @@
 use nix::unistd::Uid;
-use std::{
-    fs,
-    path::Path,
-    process::{Command, ExitCode},
-};
+use std::{fs, path::Path, process::Command};
 
 pub fn uninstall() -> Result<(), UninstallError> {
     println!("Uninstalling....");
@@ -12,7 +8,7 @@ pub fn uninstall() -> Result<(), UninstallError> {
         println!("Running as root.");
     } else {
         eprintln!("error: this program must be run as root.");
-        return ExitCode::FAILURE;
+        return Err(UninstallError::RootPermissionRequired);
     }
 
     let config_path = Path::new("/etc/sail");
@@ -109,4 +105,6 @@ pub fn uninstall() -> Result<(), UninstallError> {
     Ok(())
 }
 
-pub enum UninstallError {}
+pub enum UninstallError {
+    RootPermissionRequired,
+}

@@ -5,3 +5,22 @@ edition = "2021"
 [[bin]]
 name = "saild"
 path = "src/main.rs"
+
+[dependencies]
+hyper-util = { workspace = true, features = [
+    "http1",
+    "server-auto",
+    "server-graceful",
+    "service",
+    "tokio",
+] }
+tokio = { workspace = true, features = [
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
