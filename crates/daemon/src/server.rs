@@ -1,7 +1,14 @@
+use http_body_util::Full;
+use hyper::{
+    body::{Bytes, Incoming},
+    Request, Response,
+};
+use std::convert::Infallible;
 use tokio::{
     io,
     net::{TcpListener, ToSocketAddrs},
 };
+use tower::Service;
 
 pub struct Server {
     listener: TcpListener,
@@ -13,17 +20,8 @@ impl Server {
 
         Ok(Self { listener })
     }
-}
 
-enum ServerError {
-    Bind(io::Error),
-    SocketFailed {
-        error: SocketError,
-        remaining_connections: GracefulShutdown,
-    },
-    SocketStopped {
-        remaining_connections: GracefulShutdown,
-    },
+    pub async fn serve_connections(&self, service: impl Service<Request<Incoming>>) {}
 }
 
 async fn hello_world(_: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {

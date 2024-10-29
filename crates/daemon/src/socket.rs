@@ -1,20 +1,21 @@
 use crate::shutdown::ShutdownSignal;
 use core::fmt::{self, Formatter};
-use sail_core::SocketRequest;
+use sail_core::{SocketRequest, SocketResponse};
 use std::{
+    convert::Infallible,
     env::{self, VarError},
     error::Error,
-    io,
+    io::{self},
     num::ParseIntError,
     os::fd::FromRawFd,
 };
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::UnixListener,
     sync::watch::Receiver,
 };
 use tower::Service;
-use tracing::{error, info, info_span, Instrument};
+use tracing::{debug, error, info, info_span, Instrument};
 
 pub struct Socket {
     listener: UnixListener,
@@ -46,11 +47,16 @@ impl Socket {
         Ok(Self { listener })
     }
 
-    pub async fn serve_connections(
+    pub async fn serve_connections<S>(
         &self,
-        service: impl Service<SocketRequest>,
+        service: S,
         mut shutdown_signal: Receiver<ShutdownSignal>,
-    ) {
+    ) where
+        S: Service<SocketRequest, Response = SocketResponse, Error = Infallible>,
+        S: Clone,
+        S: Send + 'static,
+        S::Future: Send + 'static,
+    {
         loop {
             tokio::select! {
                 biased;
@@ -68,14 +74,33 @@ impl Socket {
 
                     info!("accepted new connection");
 
+                    let mut new_service = service.clone();
                     tokio::spawn(async move {
-                        let (reader, writer) = stream.into_split();
+                        let (reader, mut writer) = stream.into_split();
                         let mut reader = BufReader::new(reader).lines();
 
                         while let Ok(Some(line)) = reader.next_line().await {
-                            let request: SocketRequest = serde_json::from_str(&line).unwrap();
+                            debug!("socket reading line: `{line}`");
+                            let request: SocketRequest = match serde_json::from_str(&line) {
+                                Ok(request) => request,
+                                Err(error) => {
+                                    error!("failed to deserialize request: {error}");
+                                    continue
+                                }
+                            };
 
-                            let result = service.call(request).await;
+                            let Ok(response) = new_service.call(request).await;
+
+                            writer.write_all(format!("{}\n", match serde_json::to_string(&response) {
+                                Ok(string) => {
+                                    debug!("socket writing line: `{string}`");
+                                    string
+                                },
+                                Err(error) => {
+                                    error!("failed to serialize response: {error}");
+                                    continue
+                                }
+                            }).as_bytes());
                         }
                     }.instrument(info_span!("handler")));
                 },
