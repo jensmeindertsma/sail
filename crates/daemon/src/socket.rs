@@ -1,4 +1,6 @@
+use crate::shutdown::ShutdownSignal;
 use core::fmt::{self, Formatter};
+use sail_core::SocketRequest;
 use std::{
     env::{self, VarError},
     error::Error,
@@ -6,14 +8,20 @@ use std::{
     num::ParseIntError,
     os::fd::FromRawFd,
 };
-use tokio::net::{UnixListener, UnixStream};
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    net::UnixListener,
+    sync::watch::Receiver,
+};
+use tower::Service;
+use tracing::{error, info, info_span, Instrument};
 
 pub struct Socket {
     listener: UnixListener,
 }
 
 impl Socket {
-    pub fn attach() -> Result<Self, SocketError> {
+    pub fn attach() -> Result<Self, AttachmentError> {
         let var = env::var("LISTEN_FDS").map_err(AttachmentError::BadEnvironment)?;
 
         let fd_count: i32 = var
@@ -38,27 +46,41 @@ impl Socket {
         Ok(Self { listener })
     }
 
-    pub async fn accept(&mut self) -> Result<UnixStream, ()> {
-        todo!()
-    }
-}
+    pub async fn serve_connections(
+        &self,
+        service: impl Service<SocketRequest>,
+        mut shutdown_signal: Receiver<ShutdownSignal>,
+    ) {
+        loop {
+            tokio::select! {
+                biased;
 
-#[derive(Debug)]
-pub enum SocketError {
-    Attachment(AttachmentError),
-}
+                _ = shutdown_signal.changed() => break,
 
-impl fmt::Display for SocketError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "todo!")
-    }
-}
+                accept_result = self.listener.accept() => {
+                    let (stream, _) = match accept_result {
+                        Ok(connection) => connection,
+                        Err(error) => {
+                            error!("failed to accept new connection: {error}");
+                            continue
+                        }
+                    };
 
-impl Error for SocketError {}
+                    info!("accepted new connection");
 
-impl From<AttachmentError> for SocketError {
-    fn from(error: AttachmentError) -> Self {
-        Self::Attachment(error)
+                    tokio::spawn(async move {
+                        let (reader, writer) = stream.into_split();
+                        let mut reader = BufReader::new(reader).lines();
+
+                        while let Ok(Some(line)) = reader.next_line().await {
+                            let request: SocketRequest = serde_json::from_str(&line).unwrap();
+
+                            let result = service.call(request).await;
+                        }
+                    }.instrument(info_span!("handler")));
+                },
+            }
+        }
     }
 }
 

@@ -1,33 +1,37 @@
-mod command;
+mod socket;
 
-use command::{Command, ParseError};
 use owo_colors::OwoColorize;
-use std::{
-    env,
-    process::{ExitCode, Termination},
-};
+use socket::Socket;
+use std::{env, process::ExitCode};
 
-fn main() -> impl Termination {
-    let arguments = env::args().skip(1);
+const SOCKET_PATH: &str = "/run/sail.socket";
 
-    let command = match Command::try_from_arguments(arguments) {
-        Ok(command) => command,
+fn main() -> ExitCode {
+    let _arguments = env::args().skip(1);
+
+    println!("connecting to socket");
+
+    let mut socket = match Socket::connect(SOCKET_PATH) {
+        Ok(socket) => socket,
         Err(error) => {
-            let message = match error {
-                ParseError::MissingCommandArgument => "no command was specified".to_owned(),
-                ParseError::UnknownCommand(command) => format!("unknown command `{command}`"),
-            };
-
-            print_error(&message);
+            print_error(&format!("failed to connect to socket: {error}"));
             return ExitCode::FAILURE;
         }
     };
 
-    match command {
-        Command::Configure { setting, value } => configure(setting, value),
-        Command::Uninstall => uninstall(),
-        Command::Update => update(),
-    }
+    println!("connected to socket, requesting status");
+
+    let status = match socket.request_status() {
+        Ok(status) => status,
+        Err(error) => {
+            print_error(&format!(
+                "encountered error while requesting status: {error}"
+            ));
+            return ExitCode::FAILURE;
+        }
+    };
+
+    println!("Server status: {status:#?}");
 
     ExitCode::SUCCESS
 }

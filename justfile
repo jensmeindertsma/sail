@@ -10,5 +10,5 @@ update: build
 uninstall:
     sudo sail uninstall 2>/dev/null || true
 
-install: uninstall
+install: uninstall build
     ./support/development/install-local.sh

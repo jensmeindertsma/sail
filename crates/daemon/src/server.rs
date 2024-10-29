@@ -1,27 +1,31 @@
-use core::fmt::{self, Formatter};
-use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
-    server::{conn::auto::Builder, graceful::GracefulShutdown},
-    service::TowerToHyperService,
+use tokio::{
+    io,
+    net::{TcpListener, ToSocketAddrs},
 };
-use std::error::Error;
-use tokio::net::TcpStream;
 
-pub struct Server {}
-
-impl Server {
-    pub async fn new() -> Self {}
-
-    pub async fn accept(&mut self) -> Result<TcpStream, ()> {}
+pub struct Server {
+    listener: TcpListener,
 }
 
-#[derive(Debug)]
-pub enum ServerError {}
+impl Server {
+    pub async fn bind(address: impl ToSocketAddrs) -> Result<Self, io::Error> {
+        let listener = TcpListener::bind(address).await?;
 
-impl fmt::Display for ServerError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "todo!")
+        Ok(Self { listener })
     }
 }
 
-impl Error for ServerError {}
+enum ServerError {
+    Bind(io::Error),
+    SocketFailed {
+        error: SocketError,
+        remaining_connections: GracefulShutdown,
+    },
+    SocketStopped {
+        remaining_connections: GracefulShutdown,
+    },
+}
+
+async fn hello_world(_: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+}
