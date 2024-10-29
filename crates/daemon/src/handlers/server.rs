@@ -34,7 +34,7 @@ impl Service<Request<Incoming>> for ServerHandler {
     }
 }
 
-struct ServerHandlerFuture {
+pub struct ServerHandlerFuture {
     request: Request<Incoming>,
 }
 

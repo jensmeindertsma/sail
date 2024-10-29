@@ -28,10 +28,14 @@ async fn main() -> ExitCode {
         }
     };
 
+    let socket_shutdown_signal = shutdown_signal.clone();
     let socket_task = tokio::spawn(
-        socket
-            .serve_connections(SocketHandler::new(), shutdown_signal.clone())
-            .instrument(info_span!("socket")),
+        async move {
+            socket
+                .serve_connections(SocketHandler::new(), socket_shutdown_signal)
+                .await;
+        }
+        .instrument(info_span!("socket")),
     );
 
     // We need to monitor the socket task: if it stops unexpectedly, we should
@@ -39,7 +43,7 @@ async fn main() -> ExitCode {
     let mut watcher_shutdown_signal = shutdown_signal.clone();
     tokio::spawn(async move {
         tokio::select! {
-            _ = watcher_shutdown_signal.changed() => return,
+            _ = watcher_shutdown_signal.changed() => {},
             _ = socket_task => {
                 error!("socket task stopped unexpectedly, shutting down!");
                 request_shutdown();
@@ -70,10 +74,6 @@ async fn main() -> ExitCode {
         _ = sleep(Duration::from_secs(10)) => {
             error!("timed out wait for all connections to close");
         }
-    }
-
-    if let Err(error) = socket_task.await {
-        error!("failed to shutdown socket handler: {error}")
     };
 
     ExitCode::SUCCESS

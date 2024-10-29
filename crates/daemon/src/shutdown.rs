@@ -23,6 +23,6 @@ pub fn setup_shutdown_listener() -> (Receiver<ShutdownSignal>, impl FnOnce()) {
     // It is also possible to manually send a `ShutdownSignal` using the sender
     // to initiate a shutdown despite not receiving a SIGTERM
     (receiver, move || {
-        sender.send(ShutdownSignal);
+        sender.send(ShutdownSignal).unwrap();
     })
 }

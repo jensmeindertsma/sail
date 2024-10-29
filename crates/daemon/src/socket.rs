@@ -30,7 +30,7 @@ impl Socket {
             .map_err(AttachmentError::InvalidFileDescriptor)?;
 
         if fd_count != 1 {
-            return Err(AttachmentError::UnexpectedFileDescriptorCount(fd_count).into());
+            return Err(AttachmentError::UnexpectedFileDescriptorCount(fd_count));
         }
 
         // SAFETY: this file descriptor comes from systemd
@@ -91,7 +91,7 @@ impl Socket {
 
                             let Ok(response) = new_service.call(request).await;
 
-                            writer.write_all(format!("{}\n", match serde_json::to_string(&response) {
+                            if let Err(error) = writer.write_all(format!("{}\n", match serde_json::to_string(&response) {
                                 Ok(string) => {
                                     debug!("socket writing line: `{string}`");
                                     string
@@ -100,7 +100,10 @@ impl Socket {
                                     error!("failed to serialize response: {error}");
                                     continue
                                 }
-                            }).as_bytes());
+                            }).as_bytes()).await {
+                                error!("failed to write response: {error}");
+                                continue
+                            };
                         }
                     }.instrument(info_span!("handler")));
                 },
