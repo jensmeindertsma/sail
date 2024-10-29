@@ -14,7 +14,7 @@ pub enum SocketResponse {
 
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct Status {
-    listening_on: SocketAddr,
-    dashboard_hostname: String,
-    registry_hostname: String,
+    pub listening_on: SocketAddr,
+    pub dashboard_hostname: String,
+    pub registry_hostname: String,
 }

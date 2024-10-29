@@ -1,12 +1,11 @@
 use tokio::{
     signal::unix::{signal, SignalKind},
-    sync::watch::{self, Receiver, Sender},
+    sync::watch::{self, Receiver},
 };
 
-#[derive(Debug)]
 pub struct ShutdownSignal;
 
-pub fn setup_shutdown_listener() -> (Receiver<ShutdownSignal>, Sender<ShutdownSignal>) {
+pub fn setup_shutdown_listener() -> (Receiver<ShutdownSignal>, impl FnOnce()) {
     let (sender, receiver) = watch::channel(ShutdownSignal);
 
     let termination_sender = sender.clone();
@@ -23,5 +22,7 @@ pub fn setup_shutdown_listener() -> (Receiver<ShutdownSignal>, Sender<ShutdownSi
 
     // It is also possible to manually send a `ShutdownSignal` using the sender
     // to initiate a shutdown despite not receiving a SIGTERM
-    (receiver, sender)
+    (receiver, move || {
+        sender.send(ShutdownSignal);
+    })
 }

@@ -1,7 +1,9 @@
+mod handlers;
 mod server;
 mod shutdown;
 mod socket;
 
+use handlers::{ServerHandler, SocketHandler};
 use server::Server;
 use shutdown::setup_shutdown_listener;
 use socket::Socket;
@@ -16,7 +18,7 @@ async fn main() -> ExitCode {
         .with_max_level(Level::TRACE)
         .init();
 
-    let (mut shutdown_signal, _) = setup_shutdown_listener();
+    let (shutdown_signal, request_shutdown) = setup_shutdown_listener();
 
     let socket = match Socket::attach() {
         Ok(socket) => socket,
@@ -32,6 +34,19 @@ async fn main() -> ExitCode {
             .instrument(info_span!("socket")),
     );
 
+    // We need to monitor the socket task: if it stops unexpectedly, we should
+    // shutdown everything else!
+    let mut watcher_shutdown_signal = shutdown_signal.clone();
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = watcher_shutdown_signal.changed() => return,
+            _ = socket_task => {
+                error!("socket task stopped unexpectedly, shutting down!");
+                request_shutdown();
+            }
+        }
+    });
+
     let server = match Server::bind("127.0.0.1:4250").await {
         Ok(server) => server,
         Err(error) => {
@@ -40,18 +55,10 @@ async fn main() -> ExitCode {
         }
     };
 
-    let server_result = server
-        .serve_connections(ServerHandler::new(), shutdown_signal, &socket_task)
+    let remaining_connections = server
+        .serve_connections(ServerHandler::new(), shutdown_signal)
         .instrument(info_span!("server"))
         .await;
-
-    let remaining_connections = match server_result {
-        Ok(watcher) => watcher,
-        Err(error) => {
-            error!("server failed");
-            return ExitCode::FAILURE;
-        }
-    };
 
     tokio::select! {
         // Calling `.shutdown()` on the handle returned by the server after it stops its connection
