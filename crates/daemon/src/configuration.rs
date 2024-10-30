@@ -1,0 +1,47 @@
+use core::fmt::{self, Formatter};
+use std::{error::Error, sync::Mutex};
+
+pub struct Configuration {
+    settings: Mutex<Settings>,
+}
+
+impl Configuration {
+    pub async fn load() -> Result<Self, LoadError> {
+        // todo!("load configuration from filesystem")
+        Ok(Self {
+            settings: Mutex::new(Settings {
+                greeting: "Hello, World!".to_owned(),
+            }),
+        })
+    }
+
+    pub fn get(&self) -> Settings {
+        self.settings.lock().unwrap().clone()
+    }
+
+    pub fn set(&self, new_settings: Settings) {
+        *self.settings.lock().unwrap() = new_settings;
+
+        self.save()
+    }
+
+    fn save(&self) {
+        //todo!("save configuration to filesystem")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Settings {
+    pub greeting: String,
+}
+
+#[derive(Debug)]
+pub enum LoadError {}
+
+impl fmt::Display for LoadError {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for LoadError {}

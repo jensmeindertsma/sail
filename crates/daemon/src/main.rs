@@ -1,14 +1,17 @@
+mod configuration;
 mod handlers;
 mod server;
 mod shutdown;
 mod socket;
 
+use configuration::{Configuration, LoadError};
+use core::fmt::{self, Formatter};
 use handlers::{ServerHandler, SocketHandler};
 use hyper_util::server::graceful::GracefulShutdown;
 use server::Server;
 use shutdown::setup_shutdown_listener;
-use socket::Socket;
-use std::process::ExitCode;
+use socket::{AttachmentError, Socket};
+use std::{error::Error, io, process::ExitCode, sync::Arc};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, info_span, Instrument, Level};
 
@@ -19,51 +22,55 @@ async fn main() -> ExitCode {
         .with_max_level(Level::TRACE)
         .init();
 
+    if let Err(failure) = run().await {
+        error!("{failure}");
+        return ExitCode::FAILURE;
+    }
+
+    ExitCode::SUCCESS
+}
+
+async fn run() -> Result<(), Failure> {
     let mut shutdown_signal = setup_shutdown_listener();
 
-    let socket = match Socket::attach() {
-        Ok(socket) => socket,
-        Err(error) => {
-            error!("failed to attach to socket: {error}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let configuration = Arc::new(Configuration::load().await?);
+
+    let socket = Socket::attach()?;
 
     info!("attached to the socket");
 
+    let socket_configuration = configuration.clone();
     let socket_task = tokio::spawn(
         async move {
-            socket.serve_connections(SocketHandler::new()).await;
+            socket
+                .serve_connections(SocketHandler::new(socket_configuration))
+                .await;
         }
         .instrument(info_span!("socket")),
     );
 
-    let server = match Server::bind("127.0.0.1:4250").await {
-        Ok(server) => server,
-        Err(error) => {
-            error!("failed to bind to `127.0.0.1:4250`: {error}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let server = Server::bind("127.0.0.1:4250")
+        .await
+        .map_err(Failure::ServerBindError)?;
 
     info!("listening on `127.0.0.1:4250`");
 
     let watcher = GracefulShutdown::new();
-    let mut failure = false;
+    let mut socket_stopped_unexpectedly = false;
 
     tokio::select! {
         biased;
 
         _ = socket_task => {
             error!("socket task stopped unexpectedly, shutting down!");
-            failure = true
+            socket_stopped_unexpectedly = true
         }
 
         _ = shutdown_signal.changed() => {}
 
         _ = server
             .serve_connections(
-                ServerHandler::new(),
+                ServerHandler::new(configuration),
                 &watcher
             )
             .instrument(info_span!("server")) => {},
@@ -81,9 +88,48 @@ async fn main() -> ExitCode {
         }
     };
 
-    if failure {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
+    if socket_stopped_unexpectedly {
+        return Err(Failure::SocketStoppedUnexpectedly);
+    }
+
+    Ok(())
+}
+
+#[derive(Debug)]
+enum Failure {
+    CannotLoadConfiguration(LoadError),
+    ServerBindError(io::Error),
+    SocketAttachment(AttachmentError),
+    SocketStoppedUnexpectedly,
+}
+
+impl From<LoadError> for Failure {
+    fn from(error: LoadError) -> Self {
+        Self::CannotLoadConfiguration(error)
     }
 }
+
+impl From<AttachmentError> for Failure {
+    fn from(error: AttachmentError) -> Self {
+        Self::SocketAttachment(error)
+    }
+}
+
+impl fmt::Display for Failure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CannotLoadConfiguration(load_error) => {
+                write!(f, "failed to load configuration: {load_error}")
+            }
+            Self::ServerBindError(io_error) => {
+                write!(f, "failed to bind server listener: {io_error}")
+            }
+            Self::SocketAttachment(attachment_error) => {
+                write!(f, "failed to attach to socket: {attachment_error}")
+            }
+            Self::SocketStoppedUnexpectedly => write!(f, "socket handler stopped unexpectedly"),
+        }
+    }
+}
+
+impl Error for Failure {}
