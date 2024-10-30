@@ -12,12 +12,9 @@ use std::convert::Infallible;
 use tokio::{
     io,
     net::{TcpListener, ToSocketAddrs},
-    sync::watch::Receiver,
 };
 use tower::Service;
 use tracing::{error, info, info_span, Instrument};
-
-use crate::shutdown::ShutdownSignal;
 
 pub struct Server {
     listener: TcpListener,
@@ -30,11 +27,7 @@ impl Server {
         Ok(Self { listener })
     }
 
-    pub async fn serve_connections<S>(
-        &self,
-        service: S,
-        mut shutdown_signal: Receiver<ShutdownSignal>,
-    ) -> GracefulShutdown
+    pub async fn serve_connections<S>(&self, service: S, watcher: &GracefulShutdown)
     where
         S: Service<Request<Incoming>, Response = Response<Full<Bytes>>, Error = Infallible>,
         S: Clone,
@@ -42,38 +35,26 @@ impl Server {
         S::Future: Send + 'static,
     {
         let http = Builder::new(TokioExecutor::new());
-        let watcher = GracefulShutdown::new();
 
         loop {
-            tokio::select! {
-                biased;
-
-                _ = shutdown_signal.changed() => break watcher,
-
-                accept_result = self.listener.accept() => {
-                    let (stream, origin) = match accept_result {
-                        Ok(connection) => connection,
-                        Err(error) => {
-                            error!("failed to accept new connection: {error}");
-                            continue;
-                        }
-                    };
-
-                    info!("accepted new connection from {origin}");
-
-                    let io = TokioIo::new(stream);
-                    let service = TowerToHyperService::new(service.clone());
-
-                    let connection = http.serve_connection(
-                        io,
-                        service,
-                    ).into_owned();
-
-                    let future = watcher.watch(connection);
-
-                    tokio::spawn(future.instrument(info_span!("handler")));
+            let (stream, origin) = match self.listener.accept().await {
+                Ok(connection) => connection,
+                Err(error) => {
+                    error!("failed to accept new connection: {error}");
+                    continue;
                 }
-            }
+            };
+
+            info!("accepted new connection from {origin}");
+
+            let io = TokioIo::new(stream);
+            let service = TowerToHyperService::new(service.clone());
+
+            let connection = http.serve_connection(io, service).into_owned();
+
+            let future = watcher.watch(connection);
+
+            tokio::spawn(future.instrument(info_span!("handler")));
         }
     }
 }

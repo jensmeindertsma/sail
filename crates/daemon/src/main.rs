@@ -4,6 +4,7 @@ mod shutdown;
 mod socket;
 
 use handlers::{ServerHandler, SocketHandler};
+use hyper_util::server::graceful::GracefulShutdown;
 use server::Server;
 use shutdown::setup_shutdown_listener;
 use socket::Socket;
@@ -18,7 +19,7 @@ async fn main() -> ExitCode {
         .with_max_level(Level::TRACE)
         .init();
 
-    let (shutdown_signal, request_shutdown) = setup_shutdown_listener();
+    let mut shutdown_signal = setup_shutdown_listener();
 
     let socket = match Socket::attach() {
         Ok(socket) => socket,
@@ -28,28 +29,12 @@ async fn main() -> ExitCode {
         }
     };
 
-    let socket_shutdown_signal = shutdown_signal.clone();
     let socket_task = tokio::spawn(
         async move {
-            socket
-                .serve_connections(SocketHandler::new(), socket_shutdown_signal)
-                .await;
+            socket.serve_connections(SocketHandler::new()).await;
         }
         .instrument(info_span!("socket")),
     );
-
-    // We need to monitor the socket task: if it stops unexpectedly, we should
-    // shutdown everything else!
-    let mut watcher_shutdown_signal = shutdown_signal.clone();
-    tokio::spawn(async move {
-        tokio::select! {
-            _ = watcher_shutdown_signal.changed() => {},
-            _ = socket_task => {
-                error!("socket task stopped unexpectedly, shutting down!");
-                request_shutdown();
-            }
-        }
-    });
 
     let server = match Server::bind("127.0.0.1:4250").await {
         Ok(server) => server,
@@ -59,16 +44,32 @@ async fn main() -> ExitCode {
         }
     };
 
-    let remaining_connections = server
-        .serve_connections(ServerHandler::new(), shutdown_signal)
-        .instrument(info_span!("server"))
-        .await;
+    let watcher = GracefulShutdown::new();
+    let mut failure = false;
+
+    tokio::select! {
+        biased;
+
+        _ = socket_task => {
+            error!("socket task stopped unexpectedly, shutting down!");
+            failure = true
+        }
+
+        _ = shutdown_signal.changed() => {}
+
+        _ = server
+            .serve_connections(
+                ServerHandler::new(),
+                &watcher
+            )
+            .instrument(info_span!("server")) => {},
+    };
 
     tokio::select! {
         // Calling `.shutdown()` on the handle returned by the server after it stops its connection
         // loop, will gracefully terminate current connections and return a future that resolves
         // when this is finished.
-        _ = remaining_connections.shutdown() => {
+        _ = watcher.shutdown() => {
             info!("all connections gracefully closed");
         },
         _ = sleep(Duration::from_secs(10)) => {
@@ -76,5 +77,9 @@ async fn main() -> ExitCode {
         }
     };
 
-    ExitCode::SUCCESS
+    if failure {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

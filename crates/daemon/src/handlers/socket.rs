@@ -5,8 +5,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use sail_core::{SocketRequest, SocketResponse, Status};
+use sail_core::{ConfigureError, SocketRequest, SocketResponse, Status};
 use tower::Service;
+use tracing::info;
 
 #[derive(Clone)]
 pub struct SocketHandler;
@@ -39,9 +40,14 @@ impl Future for SocketHandlerFuture {
     type Output = Result<SocketResponse, Infallible>;
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        let response = match self.request {
+        let response = match &self.request {
+            SocketRequest::Configure { setting, value } => {
+                info!("configuring setting `{setting}` to `{value}`");
+
+                SocketResponse::Configure(Err(ConfigureError::UnknownSetting))
+            }
             SocketRequest::Status => SocketResponse::Status(Status {
-                listening_on: "127.0.0.1:4250".parse().unwrap(),
+                // TODO: pull actual values from configuration here.
                 dashboard_hostname: "foo".to_owned(),
                 registry_hostname: "bar".to_owned(),
             }),

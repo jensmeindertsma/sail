@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use sail_core::{SocketRequest, SocketResponse, Status};
+use sail_core::{ConfigureError, SocketRequest, SocketResponse, Status};
 
 pub struct Socket {
     reader: Lines<BufReader<UnixStream>>,
@@ -71,6 +71,21 @@ impl fmt::Display for SocketError {
 impl Error for SocketError {}
 
 impl Socket {
+    pub fn request_configure(
+        &mut self,
+        setting: String,
+        value: String,
+    ) -> Result<Result<(), ConfigureError>, SocketError> {
+        self.send(SocketRequest::Configure { setting, value })?;
+        let response = self.receive()?;
+
+        if let SocketResponse::Configure(result) = response {
+            Ok(result)
+        } else {
+            Err(SocketError::UnexpectedResponse)
+        }
+    }
+
     pub fn request_status(&mut self) -> Result<Status, SocketError> {
         self.send(SocketRequest::Status)?;
         let response = self.receive()?;

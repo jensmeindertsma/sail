@@ -1,4 +1,3 @@
-use crate::shutdown::ShutdownSignal;
 use core::fmt::{self, Formatter};
 use sail_core::{SocketRequest, SocketResponse};
 use std::{
@@ -12,7 +11,6 @@ use std::{
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::UnixListener,
-    sync::watch::Receiver,
 };
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
@@ -47,67 +45,68 @@ impl Socket {
         Ok(Self { listener })
     }
 
-    pub async fn serve_connections<S>(
-        &self,
-        service: S,
-        mut shutdown_signal: Receiver<ShutdownSignal>,
-    ) where
+    pub async fn serve_connections<S>(&self, service: S)
+    where
         S: Service<SocketRequest, Response = SocketResponse, Error = Infallible>,
         S: Clone,
         S: Send + 'static,
         S::Future: Send + 'static,
     {
         loop {
-            tokio::select! {
-                biased;
+            let (stream, _) = match self.listener.accept().await {
+                Ok(connection) => connection,
+                Err(error) => {
+                    error!("failed to accept new connection: {error}");
+                    continue;
+                }
+            };
 
-                _ = shutdown_signal.changed() => break,
+            info!("accepted new connection");
 
-                accept_result = self.listener.accept() => {
-                    let (stream, _) = match accept_result {
-                        Ok(connection) => connection,
-                        Err(error) => {
-                            error!("failed to accept new connection: {error}");
-                            continue
-                        }
-                    };
+            let mut new_service = service.clone();
+            tokio::spawn(
+                async move {
+                    let (reader, mut writer) = stream.into_split();
+                    let mut reader = BufReader::new(reader).lines();
 
-                    info!("accepted new connection");
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        debug!("socket reading line: `{line}`");
+                        let request: SocketRequest = match serde_json::from_str(&line) {
+                            Ok(request) => request,
+                            Err(error) => {
+                                error!("failed to deserialize request: {error}");
+                                continue;
+                            }
+                        };
 
-                    let mut new_service = service.clone();
-                    tokio::spawn(async move {
-                        let (reader, mut writer) = stream.into_split();
-                        let mut reader = BufReader::new(reader).lines();
+                        let Ok(response) = new_service.call(request).await;
 
-                        while let Ok(Some(line)) = reader.next_line().await {
-                            debug!("socket reading line: `{line}`");
-                            let request: SocketRequest = match serde_json::from_str(&line) {
-                                Ok(request) => request,
-                                Err(error) => {
-                                    error!("failed to deserialize request: {error}");
-                                    continue
-                                }
-                            };
-
-                            let Ok(response) = new_service.call(request).await;
-
-                            if let Err(error) = writer.write_all(format!("{}\n", match serde_json::to_string(&response) {
-                                Ok(string) => {
-                                    debug!("socket writing line: `{string}`");
-                                    string
-                                },
-                                Err(error) => {
-                                    error!("failed to serialize response: {error}");
-                                    continue
-                                }
-                            }).as_bytes()).await {
-                                error!("failed to write response: {error}");
-                                continue
-                            };
-                        }
-                    }.instrument(info_span!("handler")));
-                },
-            }
+                        if let Err(error) = writer
+                            .write_all(
+                                format!(
+                                    "{}\n",
+                                    match serde_json::to_string(&response) {
+                                        Ok(string) => {
+                                            debug!("socket writing line: `{string}`");
+                                            string
+                                        }
+                                        Err(error) => {
+                                            error!("failed to serialize response: {error}");
+                                            continue;
+                                        }
+                                    }
+                                )
+                                .as_bytes(),
+                            )
+                            .await
+                        {
+                            error!("failed to write response: {error}");
+                            continue;
+                        };
+                    }
+                }
+                .instrument(info_span!("handler")),
+            );
         }
     }
 }
