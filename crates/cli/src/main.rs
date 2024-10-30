@@ -21,9 +21,9 @@ fn main() -> ExitCode {
 }
 
 fn run(arguments: impl Iterator<Item = String>) -> Result<(), RunError> {
-    let mut socket = Socket::connect(SOCKET_PATH)?;
-
     let command = Command::parse(arguments)?;
+
+    let mut socket = Socket::connect(SOCKET_PATH)?;
 
     match command {
         Command::Configure { setting, value } => {

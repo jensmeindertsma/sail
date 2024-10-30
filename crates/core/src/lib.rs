@@ -21,13 +21,13 @@ mod configure {
 
     #[derive(Debug, Deserialize, PartialEq, Serialize)]
     pub enum ConfigureError {
-        UnknownSetting,
+        UnknownSetting(String),
     }
 
     impl fmt::Display for ConfigureError {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             match self {
-                Self::UnknownSetting => write!(f, "unknown setting"),
+                Self::UnknownSetting(setting) => write!(f, "unknown setting `{setting}`"),
             }
         }
     }

@@ -29,6 +29,8 @@ async fn main() -> ExitCode {
         }
     };
 
+    info!("attached to the socket");
+
     let socket_task = tokio::spawn(
         async move {
             socket.serve_connections(SocketHandler::new()).await;
@@ -43,6 +45,8 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+
+    info!("listening on `127.0.0.1:4250`");
 
     let watcher = GracefulShutdown::new();
     let mut failure = false;

@@ -13,7 +13,7 @@ use tokio::{
     net::UnixListener,
 };
 use tower::Service;
-use tracing::{debug, error, info, info_span, Instrument};
+use tracing::{error, info, info_span, Instrument};
 
 pub struct Socket {
     listener: UnixListener,
@@ -52,6 +52,7 @@ impl Socket {
         S: Send + 'static,
         S::Future: Send + 'static,
     {
+        let mut count = 1;
         loop {
             let (stream, _) = match self.listener.accept().await {
                 Ok(connection) => connection,
@@ -60,6 +61,9 @@ impl Socket {
                     continue;
                 }
             };
+
+            let id = count;
+            count += 1;
 
             info!("accepted new connection");
 
@@ -70,7 +74,6 @@ impl Socket {
                     let mut reader = BufReader::new(reader).lines();
 
                     while let Ok(Some(line)) = reader.next_line().await {
-                        debug!("socket reading line: `{line}`");
                         let request: SocketRequest = match serde_json::from_str(&line) {
                             Ok(request) => request,
                             Err(error) => {
@@ -79,17 +82,18 @@ impl Socket {
                             }
                         };
 
+                        info!("received request: {request:?}");
+
                         let Ok(response) = new_service.call(request).await;
+
+                        info!("sending response: {response:?}");
 
                         if let Err(error) = writer
                             .write_all(
                                 format!(
                                     "{}\n",
                                     match serde_json::to_string(&response) {
-                                        Ok(string) => {
-                                            debug!("socket writing line: `{string}`");
-                                            string
-                                        }
+                                        Ok(string) => string,
                                         Err(error) => {
                                             error!("failed to serialize response: {error}");
                                             continue;
@@ -105,7 +109,7 @@ impl Socket {
                         };
                     }
                 }
-                .instrument(info_span!("handler")),
+                .instrument(info_span!("handler", id)),
             );
         }
     }
