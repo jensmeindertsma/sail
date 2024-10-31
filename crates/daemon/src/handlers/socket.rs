@@ -9,7 +9,7 @@ use std::{
 use sail_core::{ConfigureError, SocketRequest, SocketResponse, Status};
 use tower::Service;
 
-use crate::configuration::{Configuration, Settings};
+use crate::configuration::{Configuration, DashboardSettings, RegistrySettings, Settings};
 
 #[derive(Clone)]
 pub struct SocketHandler {
@@ -49,24 +49,82 @@ impl Future for SocketHandlerFuture {
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
         let response = match &self.request {
-            SocketRequest::Configure { setting, value } => match setting.as_str() {
-                "greeting" => {
-                    self.configuration.set(Settings {
-                        greeting: value.to_owned(),
-                    });
-                    SocketResponse::Configure(Ok(()))
-                }
-                _ => SocketResponse::Configure(Err(ConfigureError::UnknownSetting(
-                    setting.to_owned(),
-                ))),
-            },
-            SocketRequest::Status => SocketResponse::Status(Status {
-                // TODO: pull actual values from configuration here.
-                dashboard_hostname: "foo".to_owned(),
-                registry_hostname: "bar".to_owned(),
-            }),
+            SocketRequest::Configure { setting, value } => {
+                let result = configure(&self.configuration, setting, value);
+
+                SocketResponse::Configure(result)
+            }
+            SocketRequest::Status => {
+                let settings = self.configuration.get();
+                let status = Status {
+                    dashboard_hostname: settings.dashboard.hostname,
+                    registry_hostname: settings.registry.hostname,
+                };
+
+                SocketResponse::Status(status)
+            }
         };
 
         Poll::Ready(Ok(response))
     }
+}
+
+fn configure(
+    configuration: &Arc<Configuration>,
+    setting: &str,
+    value: &str,
+) -> Result<(), ConfigureError> {
+    let current_settings = configuration.get();
+
+    let mut parts = setting.split('.');
+
+    match parts
+        .next()
+        .ok_or(ConfigureError::UnknownSetting(setting.to_owned()))?
+    {
+        "dashboard" => {
+            match parts
+                .next()
+                .ok_or(ConfigureError::UnknownSetting(setting.to_owned()))?
+            {
+                "hostname" => {
+                    configuration.set(Settings {
+                        dashboard: DashboardSettings {
+                            hostname: value.to_owned(),
+                        },
+                        ..current_settings
+                    });
+                }
+                other => Err(ConfigureError::UnknownSetting(other.to_owned()))?,
+            }
+        }
+
+        "greeting" => {
+            configuration.set(Settings {
+                greeting: value.to_owned(),
+                ..current_settings
+            });
+        }
+
+        "registry" => {
+            match parts
+                .next()
+                .ok_or(ConfigureError::UnknownSetting(setting.to_owned()))?
+            {
+                "hostname" => {
+                    configuration.set(Settings {
+                        registry: RegistrySettings {
+                            hostname: value.to_owned(),
+                        },
+                        ..current_settings
+                    });
+                }
+                other => Err(ConfigureError::UnknownSetting(other.to_owned()))?,
+            }
+        }
+
+        other => Err(ConfigureError::UnknownSetting(other.to_owned()))?,
+    }
+
+    Ok(())
 }

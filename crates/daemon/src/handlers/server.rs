@@ -11,6 +11,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::Service;
+use tracing::info;
 
 use crate::configuration::Configuration;
 
@@ -52,8 +53,11 @@ impl Future for ServerHandlerFuture {
 
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
         let greeting = self.configuration.get().greeting;
+
+        info!("handling request to {}", self.request.uri());
+
         Poll::Ready(Ok(Response::new(Full::new(Bytes::from(format!(
-            "{greeting} `{}`",
+            "{greeting} `{}`\n",
             self.request.uri()
         ))))))
     }

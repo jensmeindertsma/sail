@@ -7,10 +7,16 @@ pub struct Configuration {
 
 impl Configuration {
     pub async fn load() -> Result<Self, LoadError> {
-        // todo!("load configuration from filesystem")
+        TODO ("load configuration from filesystem")
         Ok(Self {
             settings: Mutex::new(Settings {
                 greeting: "Hello, World!".to_owned(),
+                dashboard: DashboardSettings {
+                    hostname: "dashboard.haven.com".to_owned(),
+                },
+                registry: RegistrySettings {
+                    hostname: "registry.haven.com".to_owned(),
+                },
             }),
         })
     }
@@ -26,13 +32,25 @@ impl Configuration {
     }
 
     fn save(&self) {
-        //todo!("save configuration to filesystem")
+        TODO ("save configuration to filesystem")
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Settings {
     pub greeting: String,
+    pub dashboard: DashboardSettings,
+    pub registry: RegistrySettings,
+}
+
+#[derive(Clone, Debug)]
+pub struct DashboardSettings {
+    pub hostname: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct RegistrySettings {
+    pub hostname: String,
 }
 
 #[derive(Debug)]

@@ -31,7 +31,7 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> Result<(), Failure> {
-    let mut shutdown_signal = setup_shutdown_listener();
+    let mut shutdown_listener = setup_shutdown_listener();
 
     let configuration = Arc::new(Configuration::load().await?);
 
@@ -61,12 +61,16 @@ async fn run() -> Result<(), Failure> {
     tokio::select! {
         biased;
 
+        // In case the socket task resolves *before* we've received a shutdown signal,
+        // we want to shut down the whole program to prevent it from "limping".
         _ = socket_task => {
             error!("socket task stopped unexpectedly, shutting down!");
             socket_stopped_unexpectedly = true
         }
 
-        _ = shutdown_signal.changed() => {}
+        // Initiate shutdown by stopping the polling of the socket and server futures
+        // which have internal connect/accept/handle loops.
+        _ = shutdown_listener.changed() => {}
 
         _ = server
             .serve_connections(
