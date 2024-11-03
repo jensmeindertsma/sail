@@ -7,11 +7,10 @@ pub struct Configuration {
 
 impl Configuration {
     pub async fn load() -> Result<Self, LoadError> {
-        TODO ("load configuration from filesystem")
-        toml::from_str(s);
+        //TODO ("load configuration from filesystem")
+        //toml::from_str(s);
 
         Ok(Self {
-
             settings: Mutex::new(Settings {
                 greeting: "Hello, World!".to_owned(),
                 dashboard: DashboardSettings {
@@ -35,9 +34,9 @@ impl Configuration {
     }
 
     fn save(&self) {
-        TODO ("save configuration to filesystem")
+        //TODO ("save configuration to filesystem")
 
-        toml::from_str(s)
+        //toml::from_str(s)
     }
 }
 
