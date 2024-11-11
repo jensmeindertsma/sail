@@ -8,5 +8,6 @@ path = "src/main.rs"
 
 [dependencies]
 owo-colors.workspace = true
+reqwest = { workspace = true, features = ["blocking", "json"] }
 sail-core.path = "../core"
 serde_json.workspace = true

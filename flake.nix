@@ -29,6 +29,7 @@
               just
               nil
               openssl
+              pkg-config
               rust-analyzer-unwrapped
               toolchain
             ];

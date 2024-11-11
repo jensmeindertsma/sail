@@ -1,7 +1,7 @@
 mod command;
 mod socket;
 
-use command::{Command, ParseError};
+use command::{update, Command, ParseError};
 use core::fmt::{self, Formatter};
 use owo_colors::OwoColorize;
 use socket::{Socket, SocketError};
@@ -43,6 +43,8 @@ fn run(arguments: impl Iterator<Item = String>) -> Result<(), Failure> {
 
             println!("Status = {status:#?}");
         }
+
+        Command::Update => update::update(),
     }
 
     Ok(())

@@ -1,10 +1,11 @@
-mod update;
+pub mod update;
 
 use core::fmt::{self, Formatter};
 use std::error::Error;
 
 pub enum Command {
     Configure { setting: String, value: String },
+    Update,
     Status,
 }
 
@@ -25,7 +26,7 @@ impl Command {
                 Ok(Self::Configure { setting, value })
             }
             "status" => Ok(Self::Status),
-            "update" => update::update(),
+            "update" => Ok(Self::Update),
             _ => Err(ParseError::UnknownCommand(command_argument)),
         }
     }
