@@ -1,27 +1,35 @@
-use core::fmt::{self, Formatter};
-use std::{error::Error, sync::Mutex};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::sync::Mutex;
+
+use tracing::error;
 
 pub struct Configuration {
     settings: Mutex<Settings>,
 }
 
 impl Configuration {
-    pub async fn load() -> Result<Self, LoadError> {
-        TODO ("load configuration from filesystem")
-        toml::from_str(s);
-
-        Ok(Self {
-
-            settings: Mutex::new(Settings {
+    pub fn load() -> Self {
+        let setting = match fs::read_to_string("/etc/sail/configuration.toml")
+            .map(|s| toml::from_str::<Settings>(&s))
+        {
+            Ok(Ok(settings)) => settings,
+            _ => Settings {
                 greeting: "Hello, World!".to_owned(),
-                dashboard: DashboardSettings {
-                    hostname: "dashboard.haven.com".to_owned(),
-                },
+
                 registry: RegistrySettings {
-                    hostname: "registry.haven.com".to_owned(),
+                    hostname: "registry.jensmeindertsma.com".to_owned(),
                 },
-            }),
-        })
+            },
+        };
+
+        let configuration = Self {
+            settings: Mutex::new(setting),
+        };
+
+        configuration.save();
+
+        configuration
     }
 
     pub fn get(&self) -> Settings {
@@ -35,36 +43,27 @@ impl Configuration {
     }
 
     fn save(&self) {
-        TODO ("save configuration to filesystem")
+        let file = match toml::to_string_pretty(&self.settings) {
+            Ok(file) => file,
+            Err(_) => {
+                error!("failed to serialize settings, cannot save the configuration");
+                return;
+            }
+        };
 
-        toml::from_str(s)
+        if let Err(error) = fs::write("/etc/sail/configuration.toml", file) {
+            error!("failed to save configuration: {error}")
+        }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Settings {
     pub greeting: String,
-    pub dashboard: DashboardSettings,
     pub registry: RegistrySettings,
 }
 
-#[derive(Clone, Debug)]
-pub struct DashboardSettings {
-    pub hostname: String,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RegistrySettings {
     pub hostname: String,
 }
-
-#[derive(Debug)]
-pub enum LoadError {}
-
-impl fmt::Display for LoadError {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
-        todo!()
-    }
-}
-
-impl Error for LoadError {}

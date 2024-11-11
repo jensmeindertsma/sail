@@ -57,13 +57,8 @@ done
 
 echo "Sail is now running."
 
-read -r -p "Enter dashboard hostname: " dashboard_hostname
-sudo sail configure dashboard.hostname "$dashboard_hostname"
-
 read -r -p "Enter registry hostname: " registry_hostname
 sudo sail configure registry.hostname "$registry_hostname"
-
-curl -H "Host: $dashboard_hostname" localhost:4250 /status 
 
 echo "Installation finished!"
 echo "** Next steps **"

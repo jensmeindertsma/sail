@@ -17,8 +17,10 @@ hyper-util = { workspace = true, features = [
     "tokio",
 ] }
 sail-core.path = "../core"
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = [
+    "fs",
     "macros",
     "net",
     "rt-multi-thread",

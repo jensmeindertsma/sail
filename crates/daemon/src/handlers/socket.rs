@@ -9,7 +9,7 @@ use std::{
 use sail_core::{ConfigureError, SocketRequest, SocketResponse, Status};
 use tower::Service;
 
-use crate::configuration::{Configuration, DashboardSettings, RegistrySettings, Settings};
+use crate::configuration::{Configuration, RegistrySettings, Settings};
 
 #[derive(Clone)]
 pub struct SocketHandler {
@@ -57,7 +57,6 @@ impl Future for SocketHandlerFuture {
             SocketRequest::Status => {
                 let settings = self.configuration.get();
                 let status = Status {
-                    dashboard_hostname: settings.dashboard.hostname,
                     registry_hostname: settings.registry.hostname,
                 };
 
@@ -82,29 +81,10 @@ fn configure(
         .next()
         .ok_or(ConfigureError::UnknownSetting(setting.to_owned()))?
     {
-        "dashboard" => {
-            match parts
-                .next()
-                .ok_or(ConfigureError::UnknownSetting(setting.to_owned()))?
-            {
-                "hostname" => {
-                    configuration.set(Settings {
-                        dashboard: DashboardSettings {
-                            hostname: value.to_owned(),
-                        },
-                        ..current_settings
-                    });
-                }
-                other => Err(ConfigureError::UnknownSetting(other.to_owned()))?,
-            }
-        }
-
-        "greeting" => {
-            configuration.set(Settings {
-                greeting: value.to_owned(),
-                ..current_settings
-            });
-        }
+        "greeting" => configuration.set(Settings {
+            greeting: value.to_owned(),
+            ..current_settings
+        }),
 
         "registry" => {
             match parts

@@ -61,6 +61,7 @@ rm "$DOWNLOAD_PATH"
 echo "moving files, this might ask for sudo permissions"
 
 # Store version for `sail update` to check later
+sudo mkdir /etc/sail 2>/dev/null
 sudo mkdir /var/lib/sail
 echo "$VERSION" | sudo tee "$VERSION_PATH" > /dev/null
 
@@ -90,9 +91,6 @@ while ! systemctl is-active --quiet sail; do
 done
 
 echo "Sail is now running."
-
-read -r -p "Enter dashboard hostname: " dashboard_hostname
-sudo sail configure dashboard.hostname "$dashboard_hostname"
 
 read -r -p "Enter registry hostname: " registry_hostname
 sudo sail configure registry.hostname "$registry_hostname"

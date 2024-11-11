@@ -1,3 +1,5 @@
+mod update;
+
 use core::fmt::{self, Formatter};
 use std::error::Error;
 
@@ -23,6 +25,7 @@ impl Command {
                 Ok(Self::Configure { setting, value })
             }
             "status" => Ok(Self::Status),
+            "update" => update::update(),
             _ => Err(ParseError::UnknownCommand(command_argument)),
         }
     }

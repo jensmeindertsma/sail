@@ -40,7 +40,6 @@ mod status {
 
     #[derive(Debug, Deserialize, PartialEq, Serialize)]
     pub struct Status {
-        pub dashboard_hostname: String,
         pub registry_hostname: String,
     }
 }

@@ -4,7 +4,7 @@ mod server;
 mod shutdown;
 mod socket;
 
-use configuration::{Configuration, LoadError};
+use configuration::Configuration;
 use core::fmt::{self, Formatter};
 use handlers::{ServerHandler, SocketHandler};
 use hyper_util::server::graceful::GracefulShutdown;
@@ -33,7 +33,7 @@ async fn main() -> ExitCode {
 async fn run() -> Result<(), Failure> {
     let mut shutdown_listener = setup_shutdown_listener();
 
-    let configuration = Arc::new(Configuration::load().await?);
+    let configuration = Arc::new(Configuration::load());
 
     let socket = Socket::attach()?;
 
@@ -101,16 +101,9 @@ async fn run() -> Result<(), Failure> {
 
 #[derive(Debug)]
 enum Failure {
-    CannotLoadConfiguration(LoadError),
     ServerBindError(io::Error),
     SocketAttachment(AttachmentError),
     SocketStoppedUnexpectedly,
-}
-
-impl From<LoadError> for Failure {
-    fn from(error: LoadError) -> Self {
-        Self::CannotLoadConfiguration(error)
-    }
 }
 
 impl From<AttachmentError> for Failure {
@@ -122,9 +115,6 @@ impl From<AttachmentError> for Failure {
 impl fmt::Display for Failure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::CannotLoadConfiguration(load_error) => {
-                write!(f, "failed to load configuration: {load_error}")
-            }
             Self::ServerBindError(io_error) => {
                 write!(f, "failed to bind server listener: {io_error}")
             }
