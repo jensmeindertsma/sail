@@ -43,17 +43,9 @@ impl Configuration {
     }
 
     fn save(&self) {
-        let file = match toml::to_string_pretty(&self.settings) {
-            Ok(file) => file,
-            Err(_) => {
-                error!("failed to serialize settings, cannot save the configuration");
-                return;
-            }
-        };
+        TODO ("save configuration to filesystem")
 
-        if let Err(error) = fs::write("/etc/sail/configuration.toml", file) {
-            error!("failed to save configuration: {error}")
-        }
+        toml::from_str(s)
     }
 }
 
