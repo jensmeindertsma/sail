@@ -104,12 +104,14 @@ pub fn update() {
         .status()
         .unwrap();
 
-    Command::new("systemctl")
+    Command::new("sudo")
+        .arg("systemctl")
         .arg("daemon-reload")
         .status()
         .unwrap();
 
-    Command::new("systemctl")
+    Command::new("sudo")
+        .arg("systemctl")
         .arg("start")
         .arg("sail")
         .status()

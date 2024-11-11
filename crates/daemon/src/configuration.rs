@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
-
 use tracing::error;
 
 pub struct Configuration {
@@ -14,7 +13,7 @@ impl Configuration {
             .map(|s| toml::from_str::<Settings>(&s))
         {
             Ok(Ok(settings)) => settings,
-            _ => Settings {
+            _default => Settings {
                 greeting: "Hello, World!".to_owned(),
 
                 registry: RegistrySettings {
@@ -43,9 +42,17 @@ impl Configuration {
     }
 
     fn save(&self) {
-        TODO ("save configuration to filesystem")
+        let str = match toml::to_string_pretty(&self.settings) {
+            Ok(str) => str,
+            Err(e) => {
+                error!("failed to serialize settings: {e}");
+                return;
+            }
+        };
 
-        toml::from_str(s)
+        if let Err(e) = fs::write("/etc/sail/configuration.toml", str) {
+            error!("failed to write configuration to disk {e}")
+        }
     }
 }
 
