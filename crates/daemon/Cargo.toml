@@ -1,5 +1,5 @@
 [package]
-name = "daemon"
+name = "sail-daemon"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,7 +8,12 @@ name = "saild"
 path = "src/main.rs"
 
 [dependencies]
-http-body-util = "0.1.2"
-hyper = { version = "1.5.2", features = ["http1", "server"] }
-hyper-util = { version = "0.1.10", features = ["tokio"] }
-tokio = { version = "1.42.0", features = ["macros", "net", "rt-multi-thread"] }
+sail-core.path = "../core"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = [
+    "io-util",
+    "macros",
+    "net",
+    "rt-multi-thread",
+] }
