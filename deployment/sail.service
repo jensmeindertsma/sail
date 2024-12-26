@@ -1,0 +1,11 @@
+[Unit]
+Description=Application deployment system
+After=network-online.target sail.socket
+Wants=network-online.target
+Requires=sail.socket
+
+[Service]
+ExecStart=/usr/local/bin/saild
+
+[Install]
+WantedBy=multi-user.target
