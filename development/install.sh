@@ -40,5 +40,5 @@ while ! systemctl is-active --quiet sail; do
 done
 
 echo "Done!"
-echo "Run \`sudo usermod -aG sail $YOU\` to get non-sudo access to the CLI"
+echo "Run \`sudo usermod -aG sail \$YOU\` to get non-sudo access to the CLI"
 echo "(then reload your session for it to take effect!)"
