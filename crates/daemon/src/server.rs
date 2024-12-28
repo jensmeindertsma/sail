@@ -1,13 +1,5 @@
-use tokio::net::TcpListener;
+mod handler;
+mod listener;
 
-pub struct Server {
-    listener: TcpListener,
-}
-
-impl Server {
-    pub async fn bind() -> Self {
-        let listener = TcpListener::bind(("127.0.0.1", 4250)).await.unwrap();
-
-        Self { listener }
-    }
-}
+pub use handler::ServerHandler;
+pub use listener::ServerListener;

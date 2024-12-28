@@ -1,11 +1,25 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SocketRequest {
-    Greeting,
+    FetchGreeting,
+    FetchPort,
+    ModifyGreeting(String),
+    ModifyPort(u16),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SocketResponse {
-    Welcome,
+    FetchGreeting(SocketResult<String>),
+    FetchPort(SocketResult<u16>),
+    ModifyGreeting(SocketResult<()>),
+    ModifyPort(SocketResult<RestartRequired>),
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum SocketError {}
+
+type SocketResult<T> = Result<T, SocketError>;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RestartRequired;
