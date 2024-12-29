@@ -28,63 +28,13 @@ async fn main() -> ExitCode {
 
     tracing::info!("loaded configuration: {:#?}", configuration.get());
 
-    let socket_cfg = configuration.clone();
-    let socket_task = tokio::spawn(
-        async move {
-            let listener = SocketListener::attach().unwrap();
-
-            loop {
-                let stream = listener.accept().await.unwrap();
-
-                tracing::info!("accepted new socket connection");
-
-                // This one handles `SocketRequest`s, so we'll need an
-                // intermediate connection handler to act between connection
-                // and request. We do that below with SocketConnector
-                let service = SocketHandler::new(socket_cfg.clone());
-
-                tokio::spawn(
-                    async move { SocketConnector::new(stream).serve_connection(service).await }
-                        .instrument(info_span!("handler")),
-                );
-            }
-        }
-        .instrument(info_span!("socket")),
-    );
+    let socket_task =
+        tokio::spawn(start_socket_handler(configuration.clone()).instrument(info_span!("socket")));
 
     let connection_watcher = ConnectionWatcher::new();
 
-    let server_cfg = configuration.clone();
-    let server_task = tokio::spawn(
-        async move {
-            let mut listener = ServerListener::bind(server_cfg.get().port).await.unwrap();
-
-            loop {
-                let stream = listener.accept().await.unwrap();
-
-                tracing::info!("accepted new server connection");
-
-                // We create one `Service` per connection, which will handle
-                // all requests for that connection.
-                let service = ServerHandler::new(server_cfg.clone());
-
-                tokio::spawn(
-                    async move {
-                        let builder = Builder::new(TokioExecutor::new());
-
-                        builder
-                            .serve_connection(
-                                TokioIo::new(stream),
-                                TowerToHyperService::new(service),
-                            )
-                            .await
-                    }
-                    .instrument(info_span!("handler")),
-                );
-            }
-        }
-        .instrument(info_span!("server")),
-    );
+    let server_task =
+        start_server_handler(configuration, &connection_watcher).instrument(info_span!("server"));
 
     let mut crashed = false;
 
@@ -130,4 +80,50 @@ async fn main() -> ExitCode {
     }
 
     ExitCode::SUCCESS
+}
+
+async fn start_socket_handler(configuration: Arc<Configuration>) {
+    let listener = SocketListener::attach().unwrap();
+
+    loop {
+        let stream = listener.accept().await.unwrap();
+
+        tracing::info!("accepted new socket connection");
+
+        // This one handles `SocketRequest`s, so we'll need an
+        // intermediate connection handler to act between connection
+        // and request. We do that below with SocketConnector
+        let service = SocketHandler::new(configuration.clone());
+
+        tokio::spawn(
+            async move { SocketConnector::new(stream).serve_connection(service).await }
+                .instrument(info_span!("handler")),
+        );
+    }
+}
+
+async fn start_server_handler(configuration: Arc<Configuration>, watcher: &ConnectionWatcher) {
+    let mut listener = ServerListener::bind(configuration.get().port)
+        .await
+        .unwrap();
+
+    let builder = Builder::new(TokioExecutor::new());
+
+    loop {
+        let stream = listener.accept().await.unwrap();
+
+        tracing::info!("accepted new server connection");
+
+        // We create one `Service` per connection, which will handle
+        // all requests for that connection.
+        let service = ServerHandler::new(configuration.clone());
+
+        let connection = builder
+            .serve_connection(TokioIo::new(stream), TowerToHyperService::new(service))
+            .into_owned();
+
+        let future = watcher.watch(connection);
+
+        tokio::spawn(future.instrument(info_span!("handler")));
+    }
 }

@@ -12,3 +12,6 @@ uninstall:
 
 update: build
     ./development/update.sh
+
+watch: 
+    journalctl -f -u sail
