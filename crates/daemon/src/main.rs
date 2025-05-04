@@ -1,129 +1,182 @@
 mod configuration;
-mod server;
 mod shutdown;
 mod socket;
 
 use configuration::Configuration;
-use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
-    server::{conn::auto::Builder, graceful::GracefulShutdown as ConnectionWatcher},
-    service::TowerToHyperService,
+use sail_core::socket::{SocketRequest, SocketResponse};
+use shutdown::setup_shutdown_handler;
+use socket::{AttachmentError, Socket};
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    io::{self},
+    process::{ExitCode, Termination},
+    sync::Arc,
 };
-use server::{ServerHandler, ServerListener};
-use shutdown::setup_shutdown_listener;
-use socket::{SocketConnector, SocketHandler, SocketListener};
-use std::{process::ExitCode, sync::Arc, time::Duration};
-use tokio::time::sleep;
-use tracing::{Instrument, Level, info_span};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::UnixStream,
+    task::JoinHandle,
+};
+use tracing::{Instrument, Level, info, info_span, instrument::Instrumented};
 
 #[tokio::main]
-async fn main() -> ExitCode {
+async fn main() -> impl Termination {
     tracing_subscriber::fmt()
         .with_target(false)
         .with_max_level(Level::TRACE)
         .init();
 
-    let mut shutdown_listener = setup_shutdown_listener();
+    let mut shutdown_signal = setup_shutdown_handler();
+
     let configuration = Arc::new(Configuration::load().unwrap());
 
     tracing::info!("loaded configuration: {:#?}", configuration.get());
 
-    let socket_task =
-        tokio::spawn(start_socket_handler(configuration.clone()).instrument(info_span!("socket")));
+    let socket_task: Instrumented<JoinHandle<Result<(), SocketTaskError>>> =
+        tokio::spawn(async move {
+            let listener = Socket::attach()
+                .await
+                .map_err(SocketTaskError::Attachment)?;
 
-    let connection_watcher = ConnectionWatcher::new();
+            loop {
+                let (stream, _socket_address) = listener
+                    .accept()
+                    .await
+                    .map_err(SocketTaskError::Accepting)?;
 
-    let server_task =
-        start_server_handler(configuration, &connection_watcher).instrument(info_span!("server"));
+                tracing::info!("accepted new connection");
+
+                // We spawn a parent task that will then spawn the connection
+                // handler into another task. This allows us to monitor the
+                // handler task and report an error if the handler panics or
+                // returns an error.
+                tokio::spawn(async move {
+                    tracing::info!("spawning new task to handle connected");
+                    let result = tokio::spawn(handle_socket_connection(stream))
+                        .instrument(info_span!("handler"))
+                        .await;
+
+                    match result {
+                        Err(join_error) => {
+                            tracing::error!(
+                                "socket connection handler panicked or was cancelled: {join_error}"
+                            )
+                        }
+                        Ok(output) => {
+                            if let Err(error) = output {
+                                tracing::warn!(
+                                    "socket connection handler exited with error: {error}",
+                                )
+                            }
+                        }
+                    }
+                });
+            }
+        })
+        .instrument(info_span!("socket"));
 
     let mut crashed = false;
 
     tokio::select! {
         biased;
 
-        _ = socket_task => {
-            tracing::error!("socket handler terminated unexpectedly!");
+        result = socket_task => {
             crashed = true;
+
+            match result {
+                Err(join_error) => tracing::error!("socket task panicked or was cancelled: {join_error}"),
+                Ok(output) => match output {
+                    Ok(_) => tracing::warn!("socket task exited cleanly unexpected"),
+                    Err(error) => tracing::error!("socket task terminated unexpectedly with error: {error}"),
+                }
+            };
         }
 
-        // When we receive the shutdown signal we break from the `select!`
-        // and stop polling the futures.
-        _ = shutdown_listener.changed() => {
-
+        _ = shutdown_signal.changed() => {
+            tracing::info!("received shutdown signal, initiating shutdown");
         }
+    }
 
-        // Only if we have no shutdown signal AND the socket handler is still active
-        // do we process requests.
-        //
-        // NOTE: every `poll` of `server_task` will result in one new connection
-        // being accepted, which is then immediately spawned into its own task,
-        // so the server loop continues, hits the next `accept().await` and yields.
-        _ = server_task => {
-            tracing::error!("server handler terminated unexpectedly");
-            crashed = true;
-        }
-    };
-
-    // As soon as we leave the main `select!` phase we should attempt to
-    // gracefully terminate existing connections.
-    tokio::select! {
-        _ = connection_watcher.shutdown() => {
-            tracing::info!("all connections gracefully closed");
-        },
-        _ = sleep(Duration::from_secs(10)) => {
-            tracing::error!("timed out wait for all connections to close");
-        }
-    };
+    // tokio::select! {
+    //     _ = connection_watcher.shutdown() => {
+    //         tracing::info!("all connections gracefully closed");
+    //     },
+    //     _ = sleep(Duration::from_secs(10)) => {
+    //         tracing::error!("timed out wait for all connections to close");
+    //     }
+    // };
 
     if crashed {
-        return ExitCode::FAILURE;
-    }
-
-    ExitCode::SUCCESS
-}
-
-async fn start_socket_handler(configuration: Arc<Configuration>) {
-    let listener = SocketListener::attach().unwrap();
-
-    loop {
-        let stream = listener.accept().await.unwrap();
-
-        tracing::info!("accepted new socket connection");
-
-        // This one handles `SocketRequest`s, so we'll need an
-        // intermediate connection handler to act between connection
-        // and request. We do that below with SocketConnector
-        let service = SocketHandler::new(configuration.clone());
-
-        tokio::spawn(
-            async move { SocketConnector::new(stream).serve_connection(service).await }
-                .instrument(info_span!("handler")),
-        );
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
-async fn start_server_handler(configuration: Arc<Configuration>, watcher: &ConnectionWatcher) {
-    let mut listener = ServerListener::bind(configuration.get().port)
-        .await
-        .unwrap();
+#[derive(Debug)]
+enum SocketTaskError {
+    Accepting(io::Error),
+    Attachment(AttachmentError),
+    Deserialization(serde_json::Error),
+    NoMessage,
+    Read(io::Error),
+    Send(io::Error),
+    Serialization(serde_json::Error),
+}
 
-    let builder = Builder::new(TokioExecutor::new());
+impl Display for SocketTaskError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Accepting(error) => write!(f, "failed to accept connection: {error}"),
+            Self::Attachment(error) => write!(f, "failed to attach to socket: {error}"),
+            Self::Deserialization(error) => {
+                write!(f, "failed to deserialize incoming message: {error}")
+            }
+            Self::NoMessage => write!(f, "received no message from new connection"),
+            Self::Read(error) => write!(f, "failed to read incoming message: {error}"),
+            Self::Send(error) => write!(f, "failed to send outgoing message: {error}"),
+            Self::Serialization(error) => {
+                write!(f, "failed to serialize outgoing message: {error}")
+            }
+        }
+    }
+}
+
+impl Error for SocketTaskError {}
+
+async fn handle_socket_connection(stream: UnixStream) -> Result<(), SocketTaskError> {
+    let (reader, mut writer) = stream.into_split();
+    let mut reader = BufReader::new(reader).lines();
 
     loop {
-        let stream = listener.accept().await.unwrap();
+        let request: SocketRequest =
+            match reader.next_line().await.map_err(SocketTaskError::Read)? {
+                None => return Err(SocketTaskError::NoMessage),
+                Some(message) => {
+                    serde_json::from_str(&message).map_err(SocketTaskError::Deserialization)?
+                }
+            };
 
-        tracing::info!("accepted new server connection");
+        let response = match request {
+            SocketRequest::Greet { message } => {
+                info!("received message: {message}");
+                SocketResponse::Greeting {
+                    message: "Thanks for your message. I hope you will have a great day!"
+                        .to_owned(),
+                }
+            }
+        };
 
-        // We create one `Service` per connection, which will handle
-        // all requests for that connection.
-        let service = ServerHandler::new(configuration.clone());
-
-        let connection = builder
-            .serve_connection(TokioIo::new(stream), TowerToHyperService::new(service))
-            .into_owned();
-
-        let future = watcher.watch(connection);
-
-        tokio::spawn(future.instrument(info_span!("handler")));
+        writer
+            .write_all(
+                format!(
+                    "{}\n",
+                    serde_json::to_string(&response).map_err(SocketTaskError::Serialization)?
+                )
+                .as_bytes(),
+            )
+            .await
+            .map_err(SocketTaskError::Send)?;
     }
 }

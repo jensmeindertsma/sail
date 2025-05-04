@@ -4,6 +4,9 @@ help:
 build:
     cargo build
 
+check:
+    cargo clippy
+
 format:
     cargo fmt --all
 

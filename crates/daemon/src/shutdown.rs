@@ -1,12 +1,12 @@
 use tokio::{
     signal::unix::{SignalKind, signal},
-    sync::watch::{self, Receiver},
+    sync::watch::{Receiver, channel},
 };
 
 pub struct ShutdownSignal;
 
-pub fn setup_shutdown_listener() -> Receiver<ShutdownSignal> {
-    let (sender, receiver) = watch::channel(ShutdownSignal);
+pub fn setup_shutdown_handler() -> Receiver<ShutdownSignal> {
+    let (sender, receiver) = channel(ShutdownSignal);
 
     let termination_sender = sender.clone();
 
