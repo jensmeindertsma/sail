@@ -26,12 +26,12 @@ impl Socket {
         })
     }
 
-    pub fn request(&mut self, request: SocketRequest) -> Result<SocketResponse, SocketError> {
-        self.send(request)?;
+    pub fn send(&mut self, request: SocketRequest) -> Result<SocketResponse, SocketError> {
+        self.push(request)?;
         self.receive()
     }
 
-    fn send(&mut self, request: SocketRequest) -> Result<(), SocketError> {
+    fn push(&mut self, request: SocketRequest) -> Result<(), SocketError> {
         writeln!(
             self.writer,
             "{}",

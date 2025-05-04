@@ -1,3 +1,5 @@
+pub mod handler;
+
 use std::{
     env::{self, VarError},
     error::Error,

@@ -9,16 +9,14 @@ use socket::{AttachmentError, Socket};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
-    io::{self},
     process::{ExitCode, Termination},
     sync::Arc,
 };
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::UnixStream,
+    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
     task::JoinHandle,
 };
-use tracing::{Instrument, Level, info, info_span, instrument::Instrumented};
+use tracing::{Instrument, Level, info_span, instrument::Instrumented};
 
 #[tokio::main]
 async fn main() -> impl Termination {
@@ -33,6 +31,7 @@ async fn main() -> impl Termination {
 
     tracing::info!("loaded configuration: {:#?}", configuration.get());
 
+    let socket_cfg = configuration.clone();
     let socket_task: Instrumented<JoinHandle<Result<(), SocketTaskError>>> =
         tokio::spawn(async move {
             let listener = Socket::attach()
@@ -51,13 +50,60 @@ async fn main() -> impl Termination {
                 // handler into another task. This allows us to monitor the
                 // handler task and report an error if the handler panics or
                 // returns an error.
+                let parent_cfg = socket_cfg.clone();
                 tokio::spawn(async move {
-                    tracing::info!("spawning new task to handle connected");
-                    let result = tokio::spawn(handle_socket_connection(stream))
-                        .instrument(info_span!("handler"))
-                        .await;
+                    let handler_cfg = parent_cfg.clone();
+                    let handle: Instrumented<JoinHandle<Result<(), SocketTaskError>>> =
+                        tokio::spawn(async move {
+                            tracing::info!("handling new connection");
 
-                    match result {
+                            let (reader, mut writer) = stream.into_split();
+                            let mut reader = BufReader::new(reader).lines();
+
+                            loop {
+                                let request: SocketRequest = serde_json::from_str(&match reader
+                                    .next_line()
+                                    .await
+                                    .map_err(SocketTaskError::Read)?
+                                {
+                                    None => {
+                                        tracing::info!("no message, finished handling connection");
+                                        return Err(SocketTaskError::NoMessage);
+                                    }
+                                    Some(message) => message,
+                                })
+                                .map_err(SocketTaskError::Deserialization)?;
+
+                                // TODO create Handler here which implements service and get response that way
+                                let response = match request {
+                                    SocketRequest::SetGreeting { message } => {
+                                        let mut settings = handler_cfg.get();
+                                        settings.greeting = message;
+                                        handler_cfg.set(settings);
+
+                                        SocketResponse::Success
+                                    }
+                                    SocketRequest::Greet { message } => {
+                                        SocketResponse::Greeting { message }
+                                    }
+                                };
+
+                                writer
+                                    .write_all(
+                                        format!(
+                                            "{}\n",
+                                            serde_json::to_string(&response)
+                                                .map_err(SocketTaskError::Serialization)?
+                                        )
+                                        .as_bytes(),
+                                    )
+                                    .await
+                                    .map_err(SocketTaskError::Send)?;
+                            }
+                        })
+                        .instrument(info_span!("handler"));
+
+                    match handle.await {
                         Err(join_error) => {
                             tracing::error!(
                                 "socket connection handler panicked or was cancelled: {join_error}"
@@ -79,8 +125,6 @@ async fn main() -> impl Termination {
     let mut crashed = false;
 
     tokio::select! {
-        biased;
-
         result = socket_task => {
             crashed = true;
 
@@ -97,15 +141,6 @@ async fn main() -> impl Termination {
             tracing::info!("received shutdown signal, initiating shutdown");
         }
     }
-
-    // tokio::select! {
-    //     _ = connection_watcher.shutdown() => {
-    //         tracing::info!("all connections gracefully closed");
-    //     },
-    //     _ = sleep(Duration::from_secs(10)) => {
-    //         tracing::error!("timed out wait for all connections to close");
-    //     }
-    // };
 
     if crashed {
         ExitCode::FAILURE
@@ -144,39 +179,3 @@ impl Display for SocketTaskError {
 }
 
 impl Error for SocketTaskError {}
-
-async fn handle_socket_connection(stream: UnixStream) -> Result<(), SocketTaskError> {
-    let (reader, mut writer) = stream.into_split();
-    let mut reader = BufReader::new(reader).lines();
-
-    loop {
-        let request: SocketRequest =
-            match reader.next_line().await.map_err(SocketTaskError::Read)? {
-                None => return Err(SocketTaskError::NoMessage),
-                Some(message) => {
-                    serde_json::from_str(&message).map_err(SocketTaskError::Deserialization)?
-                }
-            };
-
-        let response = match request {
-            SocketRequest::Greet { message } => {
-                info!("received message: {message}");
-                SocketResponse::Greeting {
-                    message: "Thanks for your message. I hope you will have a great day!"
-                        .to_owned(),
-                }
-            }
-        };
-
-        writer
-            .write_all(
-                format!(
-                    "{}\n",
-                    serde_json::to_string(&response).map_err(SocketTaskError::Serialization)?
-                )
-                .as_bytes(),
-            )
-            .await
-            .map_err(SocketTaskError::Send)?;
-    }
-}

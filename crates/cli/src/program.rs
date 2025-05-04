@@ -12,7 +12,7 @@ const SOCKET_PATH: &str = "/run/sail.socket";
 pub fn run(mut arguments: impl Iterator<Item = String>) -> Result<(), ProgramError> {
     let mut socket = Socket::connect(SOCKET_PATH).map_err(ProgramError::Socket)?;
 
-    match arguments
+    let request = match arguments
         .next()
         .ok_or(ProgramError::MissingArgument("command".to_owned()))?
         .as_str()
@@ -22,18 +22,28 @@ pub fn run(mut arguments: impl Iterator<Item = String>) -> Result<(), ProgramErr
                 .next()
                 .ok_or(ProgramError::MissingArgument("message".to_owned()))?;
 
-            let response = socket
-                .request(SocketRequest::Greet { message })
-                .map_err(ProgramError::Socket)?;
+            SocketRequest::Greet { message }
+        }
+        "set-greeting" => {
+            let message = arguments
+                .next()
+                .ok_or(ProgramError::MissingArgument("message".to_owned()))?;
 
-            match response {
-                SocketResponse::Greeting { message } => {
-                    println!("Server responded with a greeting {message}");
-                }
-            }
+            SocketRequest::SetGreeting { message }
         }
         other => return Err(ProgramError::UnknownArgument(other.to_owned())),
-    }
+    };
+
+    let response = socket.send(request).map_err(ProgramError::Socket)?;
+
+    match response {
+        SocketResponse::Success => {
+            println!("The request completed successfully!")
+        }
+        SocketResponse::Greeting { message } => {
+            println!("Server responded with a greeting {message}");
+        }
+    };
 
     Ok(())
 }
