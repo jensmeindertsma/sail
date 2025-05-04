@@ -8,5 +8,6 @@ name = "sail"
 path = "src/main.rs"
 
 [dependencies]
+owo-colors.workspace = true
 sail-core.path = "../core"
 serde_json.workspace = true

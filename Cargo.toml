@@ -3,13 +3,10 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.dependencies]
-http-body-util = "0.1.2"
-hyper = "1.5.2"
-hyper-util = "0.1.10"
-serde = "1.0.216"
-serde_json = "1.0.134"
-tokio = "1.42.0"
-toml = "0.8.19"
-tower = "0.5.2"
+owo-colors = "4.2.0"
+serde = "1.0.219"
+serde_json = "1.0.140"
+tokio = "1.44.2"
+toml = "0.8.22"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"

@@ -4,6 +4,9 @@ help:
 build:
     cargo build
 
+format:
+    cargo fmt --all
+
 install: build
     ./development/install.sh
 
