@@ -20,3 +20,61 @@ Seamless self-owned application deployment.
 
 ## The web interface
 Eventually I hope to implement a web interface where the traffic and stats of all of the apps can be visualized. I will not implement an admin view for each app's database, this is something the app can do themselves.
+
+## TEMPORARY
+
+```rust
+// main.rs
+mod application;
+
+use application::Application;
+
+fn main() -> impl Termination {  
+    let runtime = match Builder::new_multi_thread()
+    .enable_all()
+    .build() {
+        Ok(runtime) => runtime,
+        Err(io_error) => {
+            tracing::error!("failed to set up multi thread runtime: {io_error}");
+            return ExitCode::FAILURE;
+        }
+    }
+    
+    let runtime.block_on(async move {
+        let application = Application::start()?;
+    }).instrument(info_span!("application"))
+
+    ExitCode::SUCESS
+}
+
+async fn run()
+
+// application.rs
+use std::error::Error;
+
+struct Application {
+    configuration: Arc<Configuration>
+    state: State
+}
+
+impl Application {
+
+    pub async fn start() -> Result<Self, StartupError> {
+        let configuration = Configuration::load().map_err(StartupError::Configuration)?;
+        let 
+    }
+}
+
+pub enum StartupError {
+    Configuration
+    State
+}
+
+impl Display for StartupError {
+    pub fn fmt(/* ... */) -> /* ... */ {
+        /* ... */
+    }
+}
+
+impl Error for StartupError {}
+```
