@@ -12,8 +12,6 @@ pub struct Configuration {
 impl Configuration {
     #[instrument(name = "configuration", skip_all)]
     pub fn load() -> Result<Self, toml::de::Error> {
-        tracing::debug!("loading configuration from file");
-
         match fs::read_to_string("/etc/sail/configuration.toml") {
             Ok(contents) => toml::from_str(&contents).map(|settings| Self {
                 settings: Mutex::new(settings),
@@ -45,11 +43,7 @@ impl Configuration {
             }
         };
 
-        tracing::debug!("locked settings for modification");
-
         *current = new_settings;
-
-        tracing::debug!("modified settings");
 
         drop(current);
 
@@ -58,15 +52,9 @@ impl Configuration {
 
     #[instrument(name = "configuration", skip_all)]
     pub fn save(&self) {
-        tracing::debug!("saving settings");
-
         let _ = fs::create_dir_all("/etc/sail");
 
-        tracing::debug!("created /etc/sail directory");
-
         let settings = self.get();
-
-        tracing::debug!("got settings for saving");
 
         if let Err(io_error) = fs::write(
             "/etc/sail/configuration.toml",
@@ -82,8 +70,6 @@ impl Configuration {
                 "failed to write settings to `/etc/sail/configuration.toml`: {io_error}"
             )
         }
-
-        tracing::debug!("saved settings to file");
     }
 }
 

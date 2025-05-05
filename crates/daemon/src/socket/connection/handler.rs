@@ -55,7 +55,6 @@ impl Future for HandlerFuture {
             SocketRequest::SetGreeting { message } => {
                 tracing::info!("received request to modify greeting setting");
                 let settings = self.configuration.get();
-                tracing::debug!("fetched settings");
 
                 let new_settings = Settings {
                     greeting: message.to_owned(),
