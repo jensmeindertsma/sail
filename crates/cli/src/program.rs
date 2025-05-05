@@ -10,13 +10,17 @@ use std::{
 const SOCKET_PATH: &str = "/run/sail.socket";
 
 pub fn run(mut arguments: impl Iterator<Item = String>) -> Result<(), ProgramError> {
-    let mut socket = Socket::connect(SOCKET_PATH).map_err(ProgramError::Socket)?;
-
     let request = match arguments
         .next()
         .ok_or(ProgramError::MissingArgument("command".to_owned()))?
         .as_str()
     {
+        "help" => {
+            println!("Available commands:");
+            println!("- greet <message> // send a greeting to the server");
+            println!("- set-greeting <message> // set the greeting the server will reply with");
+            return Ok(());
+        }
         "greet" => {
             let message = arguments
                 .next()
@@ -34,6 +38,7 @@ pub fn run(mut arguments: impl Iterator<Item = String>) -> Result<(), ProgramErr
         other => return Err(ProgramError::UnknownArgument(other.to_owned())),
     };
 
+    let mut socket = Socket::connect(SOCKET_PATH).map_err(ProgramError::Socket)?;
     let response = socket.send(request).map_err(ProgramError::Socket)?;
 
     match response {
@@ -59,40 +64,10 @@ impl Display for ProgramError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingArgument(name) => write!(f, "missing argument `{name}`"),
-            Self::Socket(socket_error) => write!(f, "{socket_error}"),
+            Self::Socket(socket_error) => write!(f, "socket error: {socket_error}"),
             Self::UnknownArgument(name) => write!(f, "unknown argument `{name}`"),
         }
     }
 }
 
 impl Error for ProgramError {}
-
-//     let mut arguments = env::args().skip(1);
-//     let mut socket = Socket::connect(SOCKET_PATH).unwrap();
-
-//     match arguments.next()? {
-//         None => {
-//             eprintln!("ERROR: missing required command");
-//             return ExitCode::FAILURE;
-//         }
-//         Some(value) => match value.as_str() {
-//             "greet" => {
-//                 socket.send(SocketRequest::Greet { message: greeting });
-
-//                 match socket.receive() {
-//                     SocketResponse::FetchGreeting(Ok(greeting)) => {
-//                         println!("greeting = {greeting}")
-//                     }
-
-//                     other => panic!("Got unexpected response: {other:?}"),
-//                 };
-//             }
-
-//             other => {
-//                 eprintln!("ERROR: unknown command `{other}`")
-//             }
-//         },
-//     }
-
-//     ExitCode::SUCCESS
-// }

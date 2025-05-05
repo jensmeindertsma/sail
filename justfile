@@ -11,13 +11,13 @@ format:
     cargo fmt --all
 
 install: build
-    ./development/install.sh
+    ./scripts/install.sh
 
 uninstall:
-    ./development/uninstall.sh
+    ./scripts/uninstall.sh
 
 update: build
-    ./development/update.sh
+    ./scripts/update.sh
 
 watch: 
     journalctl -f -u sail

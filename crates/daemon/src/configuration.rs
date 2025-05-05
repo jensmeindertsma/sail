@@ -1,6 +1,8 @@
+use core::panic;
 use std::{fs, sync::Mutex};
 
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -8,7 +10,10 @@ pub struct Configuration {
 }
 
 impl Configuration {
+    #[instrument(name = "configuration", skip_all)]
     pub fn load() -> Result<Self, toml::de::Error> {
+        tracing::debug!("loading configuration from file");
+
         match fs::read_to_string("/etc/sail/configuration.toml") {
             Ok(contents) => toml::from_str(&contents).map(|settings| Self {
                 settings: Mutex::new(settings),
@@ -19,37 +24,66 @@ impl Configuration {
         }
     }
 
+    #[instrument(name = "configuration", skip_all)]
     pub fn get(&self) -> Settings {
-        self.settings
-            .lock()
-            // TODO: handle this error case with tracing
-            .expect("settings lock should not become poisoned")
-            .clone()
+        match self.settings.lock() {
+            Ok(settings) => settings.clone(),
+            Err(_) => {
+                tracing::error!("configuration settings lock is poisoned, panicking");
+                panic!("configuration settings lock has been poisoned")
+            }
+        }
     }
 
+    #[instrument(name = "configuration", skip_all)]
     pub fn set(&self, new_settings: Settings) {
-        *self
-            .settings
-            .lock()
-            // TODO: handle this error case with tracing
-            .expect("settings lock should not become poisoned") = new_settings;
+        let mut current = match self.settings.lock() {
+            Ok(settings) => settings,
+            Err(_) => {
+                tracing::error!("configuration settings lock is poisoned, panicking");
+                panic!("configuration settings lock has been poisoned");
+            }
+        };
+
+        tracing::debug!("locked settings for modification");
+
+        *current = new_settings;
+
+        tracing::debug!("modified settings");
+
+        drop(current);
 
         self.save()
     }
 
+    #[instrument(name = "configuration", skip_all)]
     pub fn save(&self) {
+        tracing::debug!("saving settings");
+
         let _ = fs::create_dir_all("/etc/sail");
-        let _ = fs::write(
+
+        tracing::debug!("created /etc/sail directory");
+
+        let settings = self.get();
+
+        tracing::debug!("got settings for saving");
+
+        if let Err(io_error) = fs::write(
             "/etc/sail/configuration.toml",
-            toml::to_string_pretty(
-                &self
-                    .settings
-                    .lock()
-                    .expect("settings lock should not become poisoned")
-                    .clone(),
+            match toml::to_string_pretty(&settings) {
+                Ok(string) => string,
+                Err(error) => {
+                    tracing::error!("failed to serialize settings for saving: {error}");
+                    return;
+                }
+            },
+        ) {
+            tracing::error!(
+                "failed to write settings to `/etc/sail/configuration.toml`: {io_error}"
             )
-            .expect("serialization should not fail"),
-        );
+        }
+
+        tracing::debug!("saved settings to file");
     }
 }
 

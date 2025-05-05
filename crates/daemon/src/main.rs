@@ -3,19 +3,15 @@ mod shutdown;
 mod socket;
 
 use configuration::Configuration;
-use sail_core::socket::{SocketRequest, SocketResponse};
 use shutdown::setup_shutdown_handler;
-use socket::{AttachmentError, Socket};
+use socket::{AttachmentError, Socket, connection::SocketConnection};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     process::{ExitCode, Termination},
     sync::Arc,
 };
-use tokio::{
-    io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader},
-    task::JoinHandle,
-};
+use tokio::{io, task::JoinHandle};
 use tracing::{Instrument, Level, info_span, instrument::Instrumented};
 
 #[tokio::main]
@@ -27,10 +23,18 @@ async fn main() -> impl Termination {
 
     let mut shutdown_signal = setup_shutdown_handler();
 
-    let configuration = Arc::new(Configuration::load().unwrap());
+    let configuration = match Configuration::load() {
+        Ok(configuration) => Arc::new(configuration),
+        Err(error) => {
+            tracing::error!("failed to load configuration: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     tracing::info!("loaded configuration: {:#?}", configuration.get());
 
+    // We spawn a task here that is responsible for accepting and handling
+    // new connections and messages coming in over the socket.
     let socket_cfg = configuration.clone();
     let socket_task: Instrumented<JoinHandle<Result<(), SocketTaskError>>> =
         tokio::spawn(async move {
@@ -38,84 +42,38 @@ async fn main() -> impl Termination {
                 .await
                 .map_err(SocketTaskError::Attachment)?;
 
+            // The socket connection acceptance loop
             loop {
                 let (stream, _socket_address) = listener
                     .accept()
                     .await
                     .map_err(SocketTaskError::Accepting)?;
 
-                tracing::info!("accepted new connection");
+                tracing::info!("handling new connection");
 
-                // We spawn a parent task that will then spawn the connection
-                // handler into another task. This allows us to monitor the
-                // handler task and report an error if the handler panics or
-                // returns an error.
-                let parent_cfg = socket_cfg.clone();
+                let handler_cfg = socket_cfg.clone();
+                let handler_task = tokio::spawn(async move {
+                    SocketConnection::new(handler_cfg, stream).serve().await
+                })
+                .instrument(info_span!("handler"));
+
+                // We must spawn a task here that deals with
+                // the handler exiting due to a panic or
+                // error. If we don't spawn we would block
+                // the connection acceptance loop.
                 tokio::spawn(async move {
-                    let handler_cfg = parent_cfg.clone();
-                    let handle: Instrumented<JoinHandle<Result<(), SocketTaskError>>> =
-                        tokio::spawn(async move {
-                            tracing::info!("handling new connection");
-
-                            let (reader, mut writer) = stream.into_split();
-                            let mut reader = BufReader::new(reader).lines();
-
-                            loop {
-                                let request: SocketRequest = serde_json::from_str(&match reader
-                                    .next_line()
-                                    .await
-                                    .map_err(SocketTaskError::Read)?
-                                {
-                                    None => {
-                                        tracing::info!("no message, finished handling connection");
-                                        return Err(SocketTaskError::NoMessage);
-                                    }
-                                    Some(message) => message,
-                                })
-                                .map_err(SocketTaskError::Deserialization)?;
-
-                                // TODO create Handler here which implements service and get response that way
-                                let response = match request {
-                                    SocketRequest::SetGreeting { message } => {
-                                        let mut settings = handler_cfg.get();
-                                        settings.greeting = message;
-                                        handler_cfg.set(settings);
-
-                                        SocketResponse::Success
-                                    }
-                                    SocketRequest::Greet { message } => {
-                                        SocketResponse::Greeting { message }
-                                    }
-                                };
-
-                                writer
-                                    .write_all(
-                                        format!(
-                                            "{}\n",
-                                            serde_json::to_string(&response)
-                                                .map_err(SocketTaskError::Serialization)?
-                                        )
-                                        .as_bytes(),
-                                    )
-                                    .await
-                                    .map_err(SocketTaskError::Send)?;
-                            }
-                        })
-                        .instrument(info_span!("handler"));
-
-                    match handle.await {
+                    match handler_task.await {
                         Err(join_error) => {
                             tracing::error!(
-                                "socket connection handler panicked or was cancelled: {join_error}"
+                                "connection handler panicked or was cancelled: {join_error}"
                             )
                         }
-                        Ok(output) => {
-                            if let Err(error) = output {
-                                tracing::warn!(
-                                    "socket connection handler exited with error: {error}",
-                                )
-                            }
+                        Ok(Err(connection_error)) => {
+                            tracing::warn!(
+                                "connection handler exited with error: {connection_error}",
+                            )
                         }
+                        Ok(Ok(())) => {}
                     }
                 });
             }
@@ -153,11 +111,6 @@ async fn main() -> impl Termination {
 enum SocketTaskError {
     Accepting(io::Error),
     Attachment(AttachmentError),
-    Deserialization(serde_json::Error),
-    NoMessage,
-    Read(io::Error),
-    Send(io::Error),
-    Serialization(serde_json::Error),
 }
 
 impl Display for SocketTaskError {
@@ -165,15 +118,6 @@ impl Display for SocketTaskError {
         match self {
             Self::Accepting(error) => write!(f, "failed to accept connection: {error}"),
             Self::Attachment(error) => write!(f, "failed to attach to socket: {error}"),
-            Self::Deserialization(error) => {
-                write!(f, "failed to deserialize incoming message: {error}")
-            }
-            Self::NoMessage => write!(f, "received no message from new connection"),
-            Self::Read(error) => write!(f, "failed to read incoming message: {error}"),
-            Self::Send(error) => write!(f, "failed to send outgoing message: {error}"),
-            Self::Serialization(error) => {
-                write!(f, "failed to serialize outgoing message: {error}")
-            }
         }
     }
 }
