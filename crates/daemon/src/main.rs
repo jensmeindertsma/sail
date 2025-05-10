@@ -31,7 +31,7 @@ async fn main() -> impl Termination {
         }
     };
 
-    tracing::info!("loaded configuration",);
+    tracing::info!("loaded configuration");
 
     // We spawn a task here that is responsible for accepting and handling
     // new connections and messages coming in over the socket.
