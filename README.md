@@ -25,4 +25,27 @@ Eventually I hope to implement a web interface where the traffic and stats of al
 
 ## Setting up for development
 
-1. Make sure `direnv` is installed
+1. [Install Nix](https://nixos.org/download/#nix-install-linux)
+2. Modify `~/.config/nix/nix.conf`:
+   ```
+   experimental-features = nix-command flakes
+   max-jobs = auto
+   ```
+3. Install `direnv`:
+   ```
+   $ nix profile install nixpkgs#direnv
+   $ echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+   ```
+4. Run `direnv allow`
+
+You should now be able to run `rustc --version`:
+
+```
+$ rustc --version
+
+rustc 1.89.0-nightly (d97326eab 2025-05-15)
+```
+
+Visual Studio Code should now prompt you to reload to apply the new environment to all the extensions. That is if you have installed the recommended extensions in `.vscode/extensions.json` (VSCode should prompt to install these).
+
+Also, [install Docker](https://docs.docker.com/engine/install/ubuntu/). Then, [switch Docker to rootless mode](https://docs.docker.com/engine/security/rootless/).
