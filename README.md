@@ -41,7 +41,8 @@ Eventually I hope to implement a web interface where the traffic and stats of al
    $ nix profile install nixpkgs#direnv
    $ echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
    ```
-6. Run `direnv allow`
+6. Make `direnv` quiet by setting `hide_env_diff` to `true` in `~/.config/direnv/direnv.toml`
+7. Run `direnv allow`
 
 You should now be able to run `rustc --version`:
 
