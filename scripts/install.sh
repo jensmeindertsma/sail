@@ -16,7 +16,7 @@ then
     exit
 fi
 
-if ! systemctl is-active --quiet docker; then
+if ! systemctl --user is-active --quiet docker; then
   echo "ERROR: Docker must be installed!"
   exit
 fi

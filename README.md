@@ -2,6 +2,8 @@
 
 Seamless self-owned application deployment.
 
+The installer assumes Docker is running in rootless mode.
+
 ## User flow
 
 1. User "creates" new app in cli by giving name and hostname(s).
