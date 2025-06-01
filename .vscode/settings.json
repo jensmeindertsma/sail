@@ -3,6 +3,7 @@
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "jnoortheen.nix-ide"
   },
+  "direnv.restart.automatic": true,
   "nix.enableLanguageServer": true,
   "nix.serverPath": "nixd",
   "nix.serverSettings": {
