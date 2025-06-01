@@ -5,7 +5,7 @@ build:
     cargo build
 
 check:
-    cargo clippy
+    cargo clippy --workspace --all-targets --all-features
 
 format:
     cargo fmt --all
