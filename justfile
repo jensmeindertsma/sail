@@ -9,3 +9,6 @@ check:
 
 format:
     cargo fmt --all
+
+install: build
+    bash scripts/install.sh
