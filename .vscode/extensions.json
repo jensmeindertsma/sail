@@ -3,7 +3,7 @@
     "jnoortheen.nix-ide",
     "mkhl.direnv",
     "ms-azuretools.vscode-containers",
-    "nefrob.vscode-just-syntax",
+    "skellock.just",
     "rust-lang.rust-analyzer",
     "tamasfe.even-better-toml"
   ]
