@@ -1,7 +1,7 @@
 [Unit]
 Description=Application deployment system
-After=network-online.target sail.socket
-Requires=network-online.target sail.socket
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 ExecStart=/usr/local/bin/saild
