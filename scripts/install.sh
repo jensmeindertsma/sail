@@ -2,6 +2,18 @@
 
 set -euo pipefail
 
+echo "Creating new group 'sail'"
+
+if getent group sail >/dev/null 2>&1; then
+  echo "Group 'sail' already exists."
+  echo "Add yourself with 'sudo usermod -aG sail $USER'"
+  exit 0
+fi
+
+sudo groupadd sail
+
+echo "Add yourself with 'sudo usermod -aG sail $USER'"
+
 BINARY_PATH="/usr/local/bin"
 SERVICE_PATH="/etc/systemd/system"
 
@@ -18,12 +30,12 @@ echo "Reloading systemd"
 
 sudo systemctl daemon-reload
 
-echo "Starting saild"
+echo "Starting Sail daemon"
 
 sudo systemctl enable --now sail
 
 while ! systemctl is-active --quiet sail; do
-  echo "Waiting for Sail to start..."
+  echo "Waiting for Sail daemon to start..."
   sleep 1
 done
 

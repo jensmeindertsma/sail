@@ -1,7 +1,11 @@
 {
   "[nix]": {
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "jnoortheen.nix-ide"
+    "editor.defaultFormatter": "jnoortheen.nix-ide",
+    "editor.formatOnSave": true
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format",
+    "editor.formatOnSave": true
   },
   "direnv.restart.automatic": true,
   "nix.enableLanguageServer": true,
@@ -9,7 +13,9 @@
   "nix.serverSettings": {
     "nixd": {
       "formatting": {
-        "command": ["alejandra"]
+        "command": [
+          "alejandra"
+        ]
       }
     }
   },

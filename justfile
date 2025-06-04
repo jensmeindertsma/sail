@@ -12,3 +12,6 @@ format:
 
 install: build
     bash scripts/install.sh
+
+update: build
+    bash scripts/update.sh

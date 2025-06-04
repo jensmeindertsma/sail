@@ -1,22 +1,26 @@
-mod socket;
+mod application;
 
+use std::process::{ExitCode, Termination};
 use tokio::runtime::Builder;
 use tracing::Level;
 
-fn main() {
+fn main() -> impl Termination {
     tracing_subscriber::fmt()
         .with_max_level(Level::TRACE)
         .init();
 
-    Builder::new_multi_thread()
+    if let Err(error) = Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(application::run())
-}
+    {
+        tracing::error!("application crashed: {error}");
 
-mod application {
-    pub async fn run() {
-        loop {}
+        ExitCode::FAILURE
+    } else {
+        tracing::warn!("application stopped");
+
+        ExitCode::SUCCESS
     }
 }
