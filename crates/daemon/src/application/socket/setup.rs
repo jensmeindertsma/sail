@@ -6,5 +6,7 @@ pub fn create_socket() -> UnixListener {
         fs::remove_file("/run/sail.socket").unwrap();
     }
 
+    // TODO: better permissionss
+
     UnixListener::bind("/run/sail.socket").unwrap()
 }
