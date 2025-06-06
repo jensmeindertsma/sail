@@ -6,13 +6,9 @@ echo "Creating new group 'sail'"
 
 if getent group sail >/dev/null 2>&1; then
   echo "Group 'sail' already exists."
-  echo "Add yourself with 'sudo usermod -aG sail $USER'"
-  exit 0
+else
+  sudo groupadd sail
 fi
-
-sudo groupadd sail
-
-echo "Add yourself with 'sudo usermod -aG sail $USER'"
 
 BINARY_PATH="/usr/local/bin"
 SERVICE_PATH="/etc/systemd/system"
@@ -22,9 +18,10 @@ echo "Copying binaries to '$BINARY_PATH'"
 sudo cp "target/debug/sail" "$BINARY_PATH/sail"
 sudo cp "target/debug/saild" "$BINARY_PATH/saild"
 
-echo "Copying systemd service file to '$SERVICE_PATH'"
+echo "Copying systemd files to '$SERVICE_PATH'"
 
 sudo cp "deployment/sail.service" "$SERVICE_PATH/sail.service"
+sudo cp "deployment/sail.socket" "$SERVICE_PATH/sail.socket"
 
 echo "Reloading systemd"
 

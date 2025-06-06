@@ -16,7 +16,7 @@ fn main() {
 
         let input = buffer.trim();
 
-        let stream = UnixStream::connect("/run/sail.socket").unwrap();
+        let stream = UnixStream::connect("/run/sail.sock").unwrap();
 
         let mut reader = BufReader::new(stream.try_clone().unwrap()).lines();
         let mut writer = stream;

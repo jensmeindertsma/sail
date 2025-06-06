@@ -1,0 +1,11 @@
+[Unit]
+Description=Interface for Sail daemon
+
+[Socket]
+ListenStream=/run/sail.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=sail
+
+[Install]
+WantedBy=sockets.target
