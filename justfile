@@ -15,3 +15,6 @@ install: build
 
 update: build
     bash scripts/update.sh
+
+uninstall:
+    bash scripts/uninstall.sh

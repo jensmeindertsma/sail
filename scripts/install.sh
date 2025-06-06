@@ -8,6 +8,7 @@ if getent group sail >/dev/null 2>&1; then
   echo "Group 'sail' already exists."
 else
   sudo groupadd sail
+  echo 'Add yourself with sudo usermod -aG docker $USER'
 fi
 
 BINARY_PATH="/usr/local/bin"
