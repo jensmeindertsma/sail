@@ -18,3 +18,6 @@ update: build
 
 uninstall:
     bash scripts/uninstall.sh
+
+watch:
+    journalctl -f -u sail -o short-iso --no-pager --output=cat

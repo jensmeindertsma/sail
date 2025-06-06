@@ -2,13 +2,27 @@
 
 set -euo pipefail
 
-echo "Creating new group 'sail'"
+echo "Making sure the 'sail' group is ready to go!"
 
-if getent group sail >/dev/null 2>&1; then
-  echo "Group 'sail' already exists."
+GROUP="sail"
+
+if getent group "$GROUP" >/dev/null 2>&1; then
+  echo "Group '$GROUP' already exists."
+
+  if id -nG "$USER" | grep -qw "$GROUP"; then
+    echo "User '$USER' is already in the '$GROUP' group."
+  else
+    echo "User '$USER' is not in the '$GROUP' group. Adding..."
+    sudo usermod -aG "$GROUP" "$USER"
+    echo "User '$USER' added to '$GROUP'. You may need to log out and log back in."
+  fi
+
 else
-  sudo groupadd sail
-  echo 'Add yourself with sudo usermod -aG docker $USER'
+  echo "Group '$GROUP' does not exist. Creating..."
+  sudo groupadd "$GROUP"
+  echo "Adding user '$USER' to '$GROUP'..."
+  sudo usermod -aG "$GROUP" "$USER"
+  echo "User '$USER' added to '$GROUP'. You may need to log out and log back in."
 fi
 
 BINARY_PATH="/usr/local/bin"

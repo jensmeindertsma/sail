@@ -18,4 +18,14 @@ echo "Reloading systemd"
 
 sudo systemctl daemon-reload
 
+GROUP="sail"
+
+if getent group "$GROUP" >/dev/null 2>&1; then
+    echo "Deleting group '$GROUP'..."
+    sudo groupdel "$GROUP"
+    echo "Group '$GROUP' deleted."
+else
+    echo "Group '$GROUP' does not exist."
+fi
+
 echo "Done!"
