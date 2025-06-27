@@ -1,5 +1,5 @@
 [Unit]
-Description=Interface for Sail daemon
+Description=Communication interface for `saild`
 
 [Socket]
 ListenStream=/run/sail.sock

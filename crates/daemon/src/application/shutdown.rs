@@ -1,32 +1,38 @@
 use tokio::{
     signal::unix::{SignalKind, signal},
-    sync::watch::{Receiver, channel},
+    sync::watch::{Receiver, Sender, channel},
 };
-
-pub fn create_shutdown_listener() -> ShutdownSignal {
-    tracing::info!("setting up SIGTERM handling");
-
-    let (sender, receiver) = channel(());
-
-    tokio::spawn(async move {
-        let mut signal = signal(SignalKind::terminate()).unwrap();
-
-        // Block the task until SIGTERM
-        signal.recv().await;
-
-        sender.send(())
-    });
-
-    ShutdownSignal { receiver }
-}
 
 #[derive(Clone, Debug)]
 pub struct ShutdownSignal {
+    sender: Sender<()>,
     receiver: Receiver<()>,
 }
 
 impl ShutdownSignal {
-    pub async fn received(&mut self) {
+    pub fn new() -> Self {
+        let (sender, receiver) = channel(());
+
+        tokio::spawn({
+            let sender = sender.clone();
+            async move {
+                let mut signal = signal(SignalKind::terminate()).unwrap();
+
+                // Block the task until SIGTERM
+                signal.recv().await;
+
+                let _ = sender.send(());
+            }
+        });
+
+        Self { sender, receiver }
+    }
+
+    pub fn broadcast(&self) {
+        let _ = self.sender.send(());
+    }
+
+    pub async fn receive(&mut self) {
         self.receiver.changed().await.unwrap()
     }
 }

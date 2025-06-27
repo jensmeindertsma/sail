@@ -27,8 +27,8 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
         select! {
             biased;
 
-            _ = shutdown_signal.received() => {
-                tracing::info!("initiation socket shutdown");
+            _ = shutdown_signal.receive() => {
+                tracing::info!("shutting down");
                 break
             }
 
@@ -47,19 +47,13 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
 
     handles.retain(|handle| !handle.is_finished());
 
-    tracing::debug!(
-        "initiating graceful shutdown for {} handlers",
-        handles.len()
-    );
-
-    let shutdown = join_all(handles);
-    let timeout = sleep(Duration::from_secs(2));
+    tracing::debug!("stopping {} handlers", handles.len());
 
     tokio::select! {
-        _ = shutdown => {
+        _ = join_all(handles) => {
             tracing::debug!("all handlers completed before timeout");
         }
-        _ = timeout => {
+        _ = sleep(Duration::from_secs(2)) => {
             tracing::warn!("timeout reached; some handlers may still be running");
         }
     }

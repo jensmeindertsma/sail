@@ -12,7 +12,7 @@ pub fn create_socket() -> UnixListener {
         panic!("No socket passed from systemd");
     }
 
-    tracing::info!("Received socket file descriptor from systemd");
+    tracing::info!("received socket file descriptor from systemd");
 
     // SAFETY: systemd guarantees the FD is valid
     let std_listener = unsafe { std::os::unix::net::UnixListener::from_raw_fd(3) };
