@@ -4,17 +4,17 @@ Seamless self-owned application deployment.
 
 ## Tasks
 - [ ] Add `daemon` crate that:
-  - implements loggin with `tracing` and `tracing-subscriber`
-  - logs startup
-  - logs uptime every 10 seconds
-  - waits for shutdown signal (`SIGTERM`) from `systemd` and logs the shutdown
-- [ ] Set up scripts for installing, updating, and uninstalling the Sail program
-  - `enable --now` or stop `systemd` service and socket
-  - add or remove `systemd` files and reload `systemd`
-  - add, update, or remove binaries from `/usr/local/bin`
-  - watch daemon logs during development with a `just watch` command
+  - [x] implements logging with `tracing` and `tracing-subscriber`
+  - [x] logs startup
+  - [ ]logs uptime every 10 seconds
+  - [x] waits for shutdown signal (`SIGTERM`) from `systemd` and logs the shutdown
+- [x] Set up scripts for installing, updating, and uninstalling the Sail program
+  - [x]`enable --now` or stop `systemd` service and socket
+  - [x] add or remove `systemd` files and reload `systemd`
+  - [x] add, update, or remove binaries from `/usr/local/bin`
+  - [x] watch daemon logs during development with a `just watch` command
 - [ ] Write `CONTRIBUTING.md` guide
-- [ ] Implement basic message passing between CLI and daemon over `systemd` socket
+- [x] Implement basic message passing between CLI and daemon over `systemd` socket
 - [ ] Add HTTP listener on `localhost` port `1312` (make it serve basic HTML page with hostname on it)
   - Install Nginx and provide several configuration templates inside `docs` directory
     - Transparent (listen on port 80 only) and proxy traffic for any hostname directly to Sail

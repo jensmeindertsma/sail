@@ -17,23 +17,24 @@ pub async fn run() -> Result<(), ApplicationError> {
 
     let mut shutdown_signal = create_shutdown_listener();
 
-    let socket_task = tokio::spawn(handle_socket(shutdown_signal.clone()));
-    let server_task = tokio::spawn(handle_server(shutdown_signal.clone()));
+    let mut socket_task = tokio::spawn(handle_socket(shutdown_signal.clone()));
+    // let server_task = tokio::spawn(handle_server(shutdown_signal.clone()));
 
-    let outcome = select! {
+    select! {
         biased;
 
         _ = shutdown_signal.received() => {
             tracing::info!("shutdown signal received");
         }
 
-        _ = socket_task => {
+
+        _ = &mut socket_task => {
             tracing::error!("socket task crashed unexpectedly");
         }
 
-        _ = server_task => {
-            tracing::error!("server task crashed unexpectedly");
-        }
+        // _ = server_task => {
+        //     tracing::error!("server task crashed unexpectedly");
+        // }
     };
 
     // TODO: Handle shutdown
@@ -44,13 +45,13 @@ pub async fn run() -> Result<(), ApplicationError> {
             tracing::warn!("timeout reached while gracefully shutting down");
         }
 
-        _ = &mut socket_task => {
+        _ = socket_task => {
         tracing::info!("socket task completed");
         }
 
-        _ = &mut server_task => {
-            tracing::info!("server task shut down gracefully")
-        }
+        // _ = &mut server_task => {
+        //     tracing::info!("server task shut down gracefully")
+        // }
     };
 
     Ok(())
