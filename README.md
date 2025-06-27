@@ -8,4 +8,4 @@ Sail is a tool born out of the scripts I wrote to make deploying multiple applic
 
 However, I wanted a nicer way of managing this deployment infrastructure and gives me a better overview. This led me to create Sail: a command line tool that simplifies managing Docker and Nginx to help you deploy your applications with ease.
 
-Sail is currently **still in development**!
+Sail is currently <ins>**still in development**</ins>!
