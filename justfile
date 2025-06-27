@@ -5,19 +5,13 @@ build:
     cargo build
 
 check:
-    cargo clippy --workspace --all-targets --all-features
-
-format:
-    cargo fmt --all
+    cargo clippy
 
 install: build
-    bash scripts/install.sh
+    sudo cp "target/debug/sail" "/usr/local/bin/sail"
 
 update: build
-    bash scripts/update.sh
+    sudo cp "target/debug/sail" "/usr/local/bin/sail"
 
 uninstall:
-    bash scripts/uninstall.sh
-
-watch:
-    journalctl -f -u sail -o short-iso --no-pager --output=cat
+    sudo rm "/usr/local/bin/sail"
