@@ -6,7 +6,7 @@ Seamless self-owned application deployment.
 - [ ] Add `daemon` crate that:
   - [x] implements logging with `tracing` and `tracing-subscriber`
   - [x] logs startup
-  - [ ]logs uptime every 10 seconds
+  - [ ] logs uptime every 10 seconds
   - [x] waits for shutdown signal (`SIGTERM`) from `systemd` and logs the shutdown
 - [x] Set up scripts for installing, updating, and uninstalling the Sail program
   - [x]`enable --now` or stop `systemd` service and socket
