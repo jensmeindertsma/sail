@@ -11,4 +11,4 @@ However, I wanted a nicer way of managing this deployment infrastructure. This l
 Currently I'm developing two separate versions:
 
 - A CLI-only variant which interfaces directly with Docker and helps you set up the Nginx files that are needed
-- A variant which also includes a "daemon" that manages HTTP requests directly and routes them to the correct container.
+- A variant which also includes a "daemon" that manages uploading of new images to a private registry implemented on the daemon according to the RFC.
