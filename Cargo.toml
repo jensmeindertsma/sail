@@ -6,3 +6,7 @@ edition = "2024"
 [[bin]]
 name = "sail"
 path = "src/main.rs"
+
+[dependencies]
+bollard = "0.19.1"
+tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
