@@ -19,7 +19,7 @@ fn main() -> impl Termination {
 
         ExitCode::FAILURE
     } else {
-        tracing::warn!("application stopped");
+        tracing::info!("application stopped");
 
         ExitCode::SUCCESS
     }
