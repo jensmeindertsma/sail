@@ -4,8 +4,11 @@ help:
 build:
     cargo build
 
+format:
+    cargo fmt --check --all
+
 check:
-    cargo clippy --all
+    cargo clippy --workspace
 
 install: build
     sudo cp "target/debug/sail" "/usr/local/bin/sail"
