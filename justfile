@@ -5,7 +5,7 @@ build:
     cargo build
 
 check:
-    cargo clippy
+    cargo clippy --all
 
 install: build
     sudo cp "target/debug/sail" "/usr/local/bin/sail"
