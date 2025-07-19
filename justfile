@@ -11,10 +11,13 @@ check:
     cargo clippy --workspace
 
 install: build
-    sudo cp "target/debug/sail" "/usr/local/bin/sail"
+    bash scripts/install.sh
 
 update: build
-    sudo cp "target/debug/sail" "/usr/local/bin/sail"
+    bash scripts/update.sh
 
-uninstall:
-    sudo rm "/usr/local/bin/sail"
+remove:
+    bash scripts/remove.sh
+
+watch: 
+    journalctl -f -u sail

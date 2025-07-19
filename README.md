@@ -109,3 +109,11 @@ jens@marina:~$ ssh-add -l
     ```
   - Now you should be able to run `sudo sail` command
   - You should add yourself to the `sail` group
+
+4. Setting up Git
+- ```
+  $ mkdir ~/.config
+  ```
+- Then copy over your config
+  ```
+  $ scp -r ~/.config/git marina:~/.config/

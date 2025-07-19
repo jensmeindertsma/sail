@@ -1,8 +1,11 @@
-use std::{thread, time::Duration};
+mod application;
+
+use tokio::runtime::Builder;
 
 fn main() {
-    println!("Hello, world!");
-    loop {
-        thread::sleep(Duration::from_secs(10));
-    }
+    Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(application::run())
 }
