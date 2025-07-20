@@ -20,4 +20,4 @@ remove:
     bash scripts/remove.sh
 
 watch: 
-    journalctl -f -u sail
+    journalctl --follow --output cat -u sail
