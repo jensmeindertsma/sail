@@ -105,3 +105,22 @@ $ direnv allow .envrc
 ```
 
 Direnv extension is critical otherwise rust-analyzer won't work
+
+you'll need to reboot the machine and fully disconnect and quit VSCode for direnv to work.
+
+- ```
+  $ mkdir ~/.config
+  ```
+- Then copy over your config
+
+  ```
+  $ scp -r ~/.config/git marina:~/.config/
+  ```
+
+- Installing build files
+  - Running the `just` script:
+    ```
+    $ just install
+    ```
+
+Now you are in the sail group, but reload your shell session to be able to run `sail` without sudo.
