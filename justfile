@@ -4,11 +4,17 @@ help:
 build:
     cargo build
 
-format:
-    cargo fmt --check --all
+clean:
+  cargo clean
 
 check:
-    cargo clippy --workspace
+  cargo clippy --workspace
+
+format:
+  cargo fmt --all
+
+format-ci:
+  cargo fmt --all --check
 
 install: build
     bash scripts/install.sh
