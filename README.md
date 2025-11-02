@@ -56,6 +56,7 @@ $ newgrp docker
 $ docker info
 
 $ docker run hello-world
+
 Unable to find image 'hello-world:latest' locally
 latest: Pulling from library/hello-world
 17eec7bbc9d7: Pull complete
@@ -126,8 +127,9 @@ $ echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
 
 I configured some settings to make the output of `direnv` less verbose.
 
-```toml
+```bash
 $ cat ~/.config/direnv/direnv.toml
+
 [global]
 hide_env_diff = true
 warn_timeout = 0
