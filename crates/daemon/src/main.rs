@@ -11,16 +11,15 @@ fn main() -> impl Termination {
         .with_level(true)
         .init();
 
-    match Builder::new_multi_thread()
+    if let Err(error) = Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
         .block_on(application::run())
     {
-        Ok(_) => ExitCode::SUCCESS,
-        Err(error) => {
-            tracing::error!("daemon crashed: {error}");
-            ExitCode::FAILURE
-        }
+        tracing::error!("daemon crashed: {error}");
+        return ExitCode::FAILURE;
     }
+
+    ExitCode::SUCCESS
 }
