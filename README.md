@@ -137,7 +137,7 @@ warn_timeout = 0
 
 Now it is time to clone the repository onto the VM.
 
-```
+```bash
 $ git clone git@github.com:jensmeindertsma/sail.git
 ```
 
@@ -159,7 +159,7 @@ $ scp -r ~/.config/git marina:~/.config/
 
 Now we are pretty much done. You can now build and install the current version of Sail, then get working on some changes:
 
-```
+```bash
 $ just install
 ```
 
