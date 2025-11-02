@@ -1,3 +1,5 @@
+set quiet
+
 help:
     just --list
 
