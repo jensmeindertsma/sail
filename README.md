@@ -135,7 +135,7 @@ hide_env_diff = true
 warn_timeout = 0
 ```
 
-Now it is time to clone the repository onto the VM.
+Now it is time to clone the repository onto the VM (probably download your fork here instead).
 
 ```bash
 $ git clone git@github.com:jensmeindertsma/sail.git
