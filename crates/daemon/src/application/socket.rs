@@ -31,7 +31,8 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
 
             result = listener.accept() => {
                 match result {
-                    Ok((stream, _)) => {
+                    Ok((stream, address)) => {
+                        tracing::info!("handling new connection from {address:?}");
                         tokio::spawn(handle_connection(stream).instrument(info_span!("handler")));
                     },
                     Err(error) => {
