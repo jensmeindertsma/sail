@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "bbenoist.nix",
+    "esbenp.prettier-vscode",
+    "rust-lang.rust-analyzer",
+    "skellock.just",
+    "tamasfe.even-better-toml"
+  ]
+}
