@@ -154,7 +154,7 @@ This will start fetching packages to put together the environment.
 To make commits and push to GitHub, you'll need your SSH key (I recommend `ForwardAgent yes` inside your host `.ssh/config`) and then clone your host Git config over to the VM:
 
 ```bash
-$ scp -r ~/.config/git marina:~/.config/
+$ scp -r ~/.config/git <vm>:~/.config/
 ```
 
 Now we are pretty much done. You can now build and install the current version of Sail, then get working on some changes:
