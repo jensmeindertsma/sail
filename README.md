@@ -103,3 +103,5 @@ $ nix profile add nixpkgs#direnv
 $ echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
 $ direnv allow .envrc
 ```
+
+Direnv extension is critical otherwise rust-analyzer won't work

@@ -2,6 +2,7 @@
   "recommendations": [
     "bbenoist.nix",
     "esbenp.prettier-vscode",
+    "mkhl.direnv",
     "rust-lang.rust-analyzer",
     "skellock.just",
     "tamasfe.even-better-toml"
