@@ -101,7 +101,7 @@ $ nginx -v
 Nix is a package manager that can be used to create fully-reproducible development environment. It packages all the dependencies together so everyone works with the same.
 
 ```bash
-$ curl -fsSL https://install.determinate.systems/nix | sh -s -- install --determinate`
+$ curl -fsSL https://install.determinate.systems/nix | sh -s -- install --determinate
 ```
 
 ```bash
