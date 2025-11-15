@@ -19,13 +19,13 @@ format-ci:
   cargo fmt --all --check
 
 install: build
-    bash scripts/install.sh
+    bash develop/install.sh
 
 update: build
-    bash scripts/update.sh
+    bash develop/update.sh
 
 remove:
-    bash scripts/remove.sh
+    bash develop/remove.sh
 
 watch: 
     journalctl --follow --output cat -u sail
