@@ -1,3 +1,5 @@
+pub mod exit;
+
 use std::io;
 use tokio::{
     signal::unix::{SignalKind, signal},

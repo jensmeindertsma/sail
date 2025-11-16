@@ -1,25 +1,28 @@
 mod application;
 
 use std::process::{ExitCode, Termination};
-
 use tokio::runtime::Builder;
+use tracing::info_span;
 
 fn main() -> impl Termination {
     tracing_subscriber::fmt()
         .with_target(false)
-        .with_timer(tracing_subscriber::fmt::time::uptime())
+        .without_time()
         .with_level(true)
         .init();
 
-    if let Err(error) = Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(application::run())
-    {
-        tracing::error!("daemon crashed: {error}");
-        return ExitCode::FAILURE;
-    }
-
-    ExitCode::SUCCESS
+    info_span!("daemon").in_scope(|| {
+        match Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(application::run())
+        {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(failure) => {
+                tracing::error!("{failure}");
+                ExitCode::FAILURE
+            }
+        }
+    })
 }

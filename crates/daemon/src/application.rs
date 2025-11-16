@@ -1,18 +1,18 @@
 mod shutdown;
 mod socket;
 
-use futures::future::join_all;
+use crate::application::{shutdown::exit::handle_socket_exit, socket::SocketError};
 use shutdown::setup_shutdown_handler;
-use socket::{SocketError, handle_socket};
+use socket::handle_socket;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     io,
+    time::Duration,
 };
-use tokio::task::JoinError;
+use tokio::{join, time::timeout};
 use tracing::{Instrument, info_span};
 
-#[tracing::instrument(name = "daemon")]
 pub async fn run() -> Result<(), Failure> {
     tracing::info!("starting up");
 
@@ -25,15 +25,21 @@ pub async fn run() -> Result<(), Failure> {
         biased;
 
          _ = shutdown_signal.changed() => {
-            tracing::info!("shutdown signal received ");
+            tracing::info!("received shutdown signal");
             }
 
-        output = &mut socket_task => {
-            return output.map_err(Failure::Task)?.map_err(Failure::Socket)
-        },
+        output = &mut socket_task => handle_socket_exit(output)?,
+
     }
 
-    join_all(vec![socket_task]).await;
+    let grace_period = Duration::from_secs(5);
+    let socket_res = join!(timeout(grace_period, &mut socket_task)).0;
+
+    if socket_res.is_err() {
+        tracing::warn!("socket task did not shutdown within the grace period");
+    }
+
+    tracing::info!("shutdown complete");
 
     Ok(())
 }
@@ -42,15 +48,26 @@ pub async fn run() -> Result<(), Failure> {
 pub enum Failure {
     Signal(io::Error),
     Socket(SocketError),
-    Task(JoinError),
+    Task(Task),
+}
+
+#[derive(Debug)]
+pub enum Task {
+    Socket,
 }
 
 impl Display for Failure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Signal(io_error) => write!(f, "failed to set up shutdown listener: {io_error}"),
-            Self::Socket(socket_error) => write!(f, "socket handler failed: {socket_error}"),
-            Self::Task(join_error) => write!(f, "task crashed: {join_error}"),
+            Self::Socket(socket_error) => write!(f, "socket handler: {socket_error}"),
+            Self::Task(task) => write!(
+                f,
+                "{} task crashed",
+                match task {
+                    Task::Socket => "socket",
+                }
+            ),
         }
     }
 }

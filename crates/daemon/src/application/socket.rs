@@ -1,5 +1,7 @@
 mod connection;
 
+use crate::application::socket::connection::HandlerError;
+
 use super::shutdown::ShutdownSignal;
 use connection::handle_connection;
 use std::{
@@ -8,7 +10,7 @@ use std::{
     io,
     os::{fd::FromRawFd, unix::net::UnixListener as StdUnixListener},
 };
-use tokio::net::UnixListener;
+use tokio::{net::UnixListener, task::JoinSet};
 use tracing::{Instrument, info_span};
 
 pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), SocketError> {
@@ -21,6 +23,8 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
         UnixListener::from_std(std_fd).map_err(SocketError::CreateListener)?
     };
 
+    let mut connections = JoinSet::new();
+
     loop {
         tokio::select! {
             biased;
@@ -29,17 +33,28 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
                 return Ok(())
             }
 
+            Some(result) = connections.join_next() => {
+                match result {
+                    Ok(Err(HandlerError::EndOfFile)) => {},
+                    Ok(Handler)
+                    _ => {}
+                };
+            }
+
             result = listener.accept() => {
                 match result {
-                    Ok((stream, address)) => {
-                        tracing::info!("handling new connection from {address:?}");
-                        tokio::spawn(handle_connection(stream).instrument(info_span!("handler")));
+                    Ok((stream, _)) => {
+                        tracing::info!("handling new connection");
+                       connections.spawn(handle_connection(stream).instrument(info_span!("handler")));
                     },
                     Err(error) => {
                         return Err(SocketError::Accept(error))
                     },
                 }
             }
+
+
+
         }
     }
 }
@@ -48,6 +63,7 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
 pub enum SocketError {
     Accept(io::Error),
     CreateListener(io::Error),
+    Crash,
 }
 
 impl Display for SocketError {
@@ -57,6 +73,7 @@ impl Display for SocketError {
             Self::CreateListener(io_error) => {
                 write!(f, "failed to create socket listener: {io_error}")
             }
+            Self::Crash => write!(f, "we are so cooked"),
         }
     }
 }
