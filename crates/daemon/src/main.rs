@@ -1,4 +1,4 @@
-mod application;
+mod program;
 
 use std::process::{ExitCode, Termination};
 use tokio::runtime::Builder;
@@ -16,13 +16,10 @@ fn main() -> impl Termination {
             .enable_all()
             .build()
             .unwrap()
-            .block_on(application::run())
+            .block_on(program::start())
         {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(failure) => {
-                tracing::error!("{failure}");
-                ExitCode::FAILURE
-            }
+            Ok(_) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
         }
     })
 }

@@ -1,19 +1,22 @@
 mod connection;
 
-use crate::application::socket::connection::HandlerError;
-
-use super::shutdown::ShutdownSignal;
+use crate::program::state::State;
+use arc_swap::ArcSwap;
 use connection::handle_connection;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     io,
     os::{fd::FromRawFd, unix::net::UnixListener as StdUnixListener},
+    sync::Arc,
 };
-use tokio::{net::UnixListener, task::JoinSet};
+use tokio::{net::UnixListener, sync::watch::Receiver, task::JoinSet};
 use tracing::{Instrument, info_span};
 
-pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), SocketError> {
+pub async fn handle_socket(
+    mut signal: Receiver<()>,
+    state: Arc<ArcSwap<State>>,
+) -> Result<(), SocketError> {
     let listener = {
         let std_fd = unsafe { StdUnixListener::from_raw_fd(3) };
         std_fd
@@ -23,32 +26,28 @@ pub async fn handle_socket(mut shutdown_signal: ShutdownSignal) -> Result<(), So
         UnixListener::from_std(std_fd).map_err(SocketError::CreateListener)?
     };
 
-    let mut connections = JoinSet::new();
+    let mut handlers = JoinSet::new();
+    let mut connection_id = 1;
 
     loop {
         tokio::select! {
             biased;
 
-            _ = shutdown_signal.changed() => {
+            _ = signal.changed() => {
+                tracing::info!("received shutdown signal");
                 return Ok(())
             }
 
-            Some(result) = connections.join_next() => {
-                match result {
-                    Ok(Err(HandlerError::EndOfFile)) => {},
-                    Ok(Handler)
-                    _ => {}
-                };
-            }
+            _ = handlers.join_next() => {}
 
             result = listener.accept() => {
                 match result {
                     Ok((stream, _)) => {
-                        tracing::info!("handling new connection");
-                       connections.spawn(handle_connection(stream).instrument(info_span!("handler")));
+                       handlers.spawn(handle_connection(stream, state.clone()).instrument(info_span!("connection", id=connection_id)));
+                        connection_id += 1;
                     },
-                    Err(error) => {
-                        return Err(SocketError::Accept(error))
+                    Err(_) => {
+                        tracing::error!("failed to accept new connection");
                     },
                 }
             }
